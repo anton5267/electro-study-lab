@@ -1,0 +1,27 @@
+{
+  "name": "electro-study-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node scripts/dev-server.mjs",
+    "package": "node scripts/package-site.mjs",
+    "audit:a11y": "node scripts/audit-accessibility.mjs",
+    "smoke:http": "node scripts/smoke-http.mjs",
+    "smoke:browser": "node scripts/smoke-browser.mjs",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "smoke:dist:browser": "node scripts/smoke-dist-browser.mjs",
+    "smoke": "npm run smoke:http && npm run smoke:browser",
+    "visual:refresh": "node scripts/visual-regression.mjs --update",
+    "visual:test": "node scripts/visual-regression.mjs",
+    "test": "node scripts/test-runtime.mjs && node scripts/test-progress-state.mjs && node scripts/test-assessment-state.mjs && node scripts/test-validation.mjs",
+    "validate": "node scripts/validate-app.mjs",
+    "quality": "npm test && npm run validate && npm run package && npm run smoke && npm run smoke:dist && npm run smoke:dist:browser && npm run audit:a11y && npm run visual:test"
+  },
+  "devDependencies": {
+    "axe-core": "^4.11.1",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0"
+  }
+}

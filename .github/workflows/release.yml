@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build Release Artifact
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\ms-playwright
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-windows-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run quality gate
+        env:
+          CI: true
+        run: npm run quality
+
+      - name: Build static package
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run package
+
+      - name: Verify dist package
+        run: npm run smoke:dist
+
+      - name: Verify dist package in browser
+        run: npm run smoke:dist:browser
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $archiveName = "electro-study-lab-${{ github.ref_name }}.zip"
+          if (Test-Path $archiveName) { Remove-Item $archiveName -Force }
+          Compress-Archive -Path dist\* -DestinationPath $archiveName
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: electro-study-lab-${{ github.ref_name }}.zip

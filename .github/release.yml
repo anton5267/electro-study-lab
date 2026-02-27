@@ -1,0 +1,27 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Product
+      labels:
+        - feature
+        - enhancement
+        - content
+        - ui
+    - title: Quality
+      labels:
+        - qa
+        - test
+        - accessibility
+        - visual-regression
+    - title: Infrastructure
+      labels:
+        - ci
+        - build
+        - deploy
+        - release
+        - tooling
+    - title: Other Changes
+      labels:
+        - "*"

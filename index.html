@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b141d">
+  <title>Electro Study Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <a class="skip-link" id="skipLink" href="#contentStart"></a>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-backdrop" aria-hidden="true"></div>
+
+      <div class="hero-head">
+        <div class="hero-brand">
+          <div class="badge" id="badge"></div>
+          <p class="hero-kicker" id="heroKicker"></p>
+        </div>
+
+        <div class="hero-actions">
+          <div class="lang-switcher" id="languageSwitcher" aria-label="Language switcher">
+            <button class="lang-btn" type="button" data-lang="uk">UA</button>
+            <button class="lang-btn" type="button" data-lang="de">DE</button>
+          </div>
+
+          <button class="icon-btn ghost-btn hidden" id="installBtn" type="button"></button>
+          <button class="icon-btn ghost-btn" id="shareLinkBtn" type="button"></button>
+          <button class="icon-btn" id="printBtn" type="button"></button>
+          <button class="icon-btn danger" id="resetAllBtn" type="button"></button>
+        </div>
+      </div>
+
+      <div class="hero-main">
+        <div class="hero-copy">
+          <h1 class="hero-title">
+            <span id="titleMain"></span>
+            <span class="accent" id="titleAccent"></span>
+          </h1>
+          <p class="subtitle" id="subtitle"></p>
+
+          <div class="search-bar">
+            <label class="search-wrap" for="searchInput">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="searchInput" type="search" autocomplete="off">
+            </label>
+            <button class="action-btn ghost" id="clearSearchBtn" type="button"></button>
+          </div>
+
+          <div class="topic-filter-bar" id="topicFilters"></div>
+
+          <div class="hero-notes">
+            <span class="note-chip" id="keyboardHint"></span>
+            <span class="note-chip" id="importHint"></span>
+            <span class="note-chip" id="offlineHint"></span>
+          </div>
+
+          <div class="status-bar" aria-live="polite">
+            <span class="status-chip online" id="connectionStatus"></span>
+            <button class="status-chip action hidden" id="updateBtn" type="button"></button>
+          </div>
+        </div>
+
+        <aside class="hero-panels">
+          <section class="panel progress-panel" aria-labelledby="progressHeading">
+            <div class="panel-row">
+              <div>
+                <p class="panel-kicker" id="progressHeading"></p>
+                <p class="panel-text" id="progressLabel"></p>
+              </div>
+              <strong class="hero-score" id="completionValue"></strong>
+            </div>
+
+            <div class="progress-track">
+              <div class="progress-fill" id="progressBar"></div>
+            </div>
+
+            <div class="metric-grid">
+              <article class="metric-card">
+                <span class="metric-label" id="metricChecklistLabel"></span>
+                <strong class="metric-value" id="metricChecklistValue"></strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label" id="metricFlashcardsLabel"></span>
+                <strong class="metric-value" id="metricFlashcardsValue"></strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label" id="metricPracticeLabel"></span>
+                <strong class="metric-value" id="metricPracticeValue"></strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label" id="metricQuizLabel"></span>
+                <strong class="metric-value" id="metricQuizValue"></strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label" id="metricExamLabel"></span>
+                <strong class="metric-value" id="metricExamValue"></strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label" id="metricAccuracyLabel"></span>
+                <strong class="metric-value" id="metricAccuracyValue"></strong>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel spotlight-panel">
+            <p class="panel-kicker" id="spotlightHeading"></p>
+            <div class="spotlight-grid">
+              <article class="spot-card">
+                <span class="spot-label" id="reviewQueueLabel"></span>
+                <strong class="spot-value" id="reviewQueueValue"></strong>
+              </article>
+              <article class="spot-card">
+                <span class="spot-label" id="sessionsLabel"></span>
+                <strong class="spot-value" id="sessionsValue"></strong>
+              </article>
+            </div>
+            <div class="spotlight-actions">
+              <button class="action-btn" id="reviewNowBtn" type="button"></button>
+              <button class="action-btn ghost" id="generateVariantBtn" type="button"></button>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </header>
+
+    <nav class="main-nav" aria-label="Study areas" role="tablist">
+      <button class="nav-tab active" type="button" data-section="overview" id="tabOverview" role="tab" aria-controls="overview" aria-selected="true" tabindex="0"></button>
+      <button class="nav-tab" type="button" data-section="theory" id="tabTheory" role="tab" aria-controls="theory" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="flashcards" id="tabFlashcards" role="tab" aria-controls="flashcards" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="practice" id="tabPractice" role="tab" aria-controls="practice" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="quiz" id="tabQuiz" role="tab" aria-controls="quiz" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="exam" id="tabExam" role="tab" aria-controls="exam" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="checklist" id="tabChecklist" role="tab" aria-controls="checklist" aria-selected="false" tabindex="-1"></button>
+      <button class="nav-tab" type="button" data-section="analytics" id="tabAnalytics" role="tab" aria-controls="analytics" aria-selected="false" tabindex="-1"></button>
+    </nav>
+
+    <main class="content-shell" id="contentStart" tabindex="-1">
+      <section class="section active" id="overview" role="tabpanel" aria-labelledby="tabOverview" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="overviewTitle"></p>
+            <p class="section-copy" id="overviewLead"></p>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="dashboardSearchTitle"></p>
+                <p class="surface-copy" id="dashboardSearchLead"></p>
+              </div>
+            </div>
+            <div id="searchResults"></div>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="reviewTitle"></p>
+                <p class="surface-copy" id="reviewLead"></p>
+              </div>
+            </div>
+            <div id="reviewList"></div>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="resourceTitle"></p>
+                <p class="surface-copy" id="resourceLead"></p>
+              </div>
+            </div>
+            <div class="resource-actions">
+              <button class="action-btn" id="importPackBtn" type="button"></button>
+              <a class="action-btn ghost" id="downloadTemplateLink" download href="assets/data/study-pack-template.json"></a>
+              <button class="action-btn ghost" id="clearCustomPackBtn" type="button"></button>
+            </div>
+            <p class="surface-note" id="resourceNote"></p>
+            <input id="importPackInput" type="file" accept=".json,application/json" hidden>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="nextStepTitle"></p>
+                <p class="surface-copy" id="nextStepLead"></p>
+              </div>
+            </div>
+            <div id="nextStepCard"></div>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="backupTitle"></p>
+                <p class="surface-copy" id="backupLead"></p>
+              </div>
+            </div>
+            <div class="resource-actions">
+              <button class="action-btn" id="exportProgressBtn" type="button"></button>
+              <button class="action-btn ghost" id="importProgressBtn" type="button"></button>
+            </div>
+            <p class="surface-note" id="backupNote"></p>
+            <input id="importProgressInput" type="file" accept=".json,application/json" hidden>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="achievementsTitle"></p>
+                <p class="surface-copy" id="achievementsLead"></p>
+              </div>
+            </div>
+            <div id="achievementsList"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="theory" role="tabpanel" aria-labelledby="tabTheory" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="theoryTitle"></p>
+            <p class="section-copy" id="theoryLead"></p>
+          </div>
+        </div>
+        <div class="stack" id="theoryContainer"></div>
+      </section>
+
+      <section class="section" id="flashcards" role="tabpanel" aria-labelledby="tabFlashcards" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="flashcardsTitle"></p>
+            <p class="section-copy" id="flashcardsLead"></p>
+          </div>
+          <div class="section-actions">
+            <button class="action-btn ghost" id="shuffleCardsBtn" type="button"></button>
+          </div>
+        </div>
+
+        <article class="surface-card flashcard-stage">
+          <button class="flashcard" type="button" id="flashcard" aria-describedby="flashcardStatus">
+            <span class="flashcard-face flashcard-front">
+              <span class="card-hint" id="fcFrontHint"></span>
+              <strong class="card-title" id="fcTerm"></strong>
+              <span class="card-topic" id="fcTopic"></span>
+            </span>
+            <span class="flashcard-face flashcard-back">
+              <span class="card-hint" id="fcBackHint"></span>
+              <span class="card-copy" id="fcDef"></span>
+            </span>
+          </button>
+        </article>
+
+        <div class="control-row">
+          <button class="action-btn ghost" id="prevCardBtn" type="button"></button>
+          <div class="control-center">
+            <span class="counter" id="fcCounter"></span>
+            <button class="action-btn" id="flipCardBtn" type="button"></button>
+          </div>
+          <button class="action-btn ghost" id="nextCardBtn" type="button"></button>
+        </div>
+
+        <p class="section-note" id="flashcardStatus"></p>
+      </section>
+
+      <section class="section" id="practice" role="tabpanel" aria-labelledby="tabPractice" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="practiceTitle"></p>
+            <p class="section-copy" id="practiceLead"></p>
+          </div>
+          <div class="section-actions">
+            <button class="action-btn ghost" id="resetPracticeBtn" type="button"></button>
+          </div>
+        </div>
+
+        <div class="stack" id="practiceContainer"></div>
+      </section>
+
+      <section class="section" id="quiz" role="tabpanel" aria-labelledby="tabQuiz" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="quizTitle"></p>
+            <p class="section-copy" id="quizLead"></p>
+          </div>
+          <div class="section-actions">
+            <button class="action-btn" id="generateQuizVariantBtn" type="button"></button>
+            <button class="action-btn ghost" id="resetQuizBtn" type="button"></button>
+          </div>
+        </div>
+
+        <div id="quizModeBanner"></div>
+        <div id="quizSummary"></div>
+        <div class="stack" id="quizContainer"></div>
+      </section>
+
+      <section class="section" id="exam" role="tabpanel" aria-labelledby="tabExam" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="examTitle"></p>
+            <p class="section-copy" id="examLead"></p>
+          </div>
+        </div>
+
+        <article class="surface-card exam-shell">
+          <div id="examIntro"></div>
+          <div id="examRuntime"></div>
+          <div id="examResult"></div>
+        </article>
+      </section>
+
+      <section class="section" id="checklist" role="tabpanel" aria-labelledby="tabChecklist" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="checklistTitle"></p>
+            <p class="section-copy" id="checklistLead"></p>
+          </div>
+          <div class="section-actions">
+            <button class="action-btn" id="completeChecklistBtn" type="button"></button>
+            <button class="action-btn ghost" id="resetChecklistBtn" type="button"></button>
+          </div>
+        </div>
+
+        <p class="section-note" id="checklistSummary"></p>
+        <div class="stack" id="checklistContainer"></div>
+      </section>
+
+      <section class="section" id="analytics" role="tabpanel" aria-labelledby="tabAnalytics" tabindex="-1">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="analyticsTitle"></p>
+            <p class="section-copy" id="analyticsLead"></p>
+          </div>
+        </div>
+
+        <div class="dashboard-grid analytics-grid">
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="analyticsStatsTitle"></p>
+                <p class="surface-copy" id="analyticsStatsLead"></p>
+              </div>
+            </div>
+            <div id="statsCards"></div>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="analyticsHistoryTitle"></p>
+                <p class="surface-copy" id="analyticsHistoryLead"></p>
+              </div>
+            </div>
+            <div id="historyList"></div>
+          </article>
+
+          <article class="surface-card">
+            <div class="surface-head">
+              <div>
+                <p class="surface-kicker" id="analyticsTopicsTitle"></p>
+                <p class="surface-copy" id="analyticsTopicsLead"></p>
+              </div>
+            </div>
+            <div id="topicMastery"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+  <div class="sr-only" id="srStatus" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="modal-shell hidden" id="welcomeModal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <p class="surface-kicker" id="welcomeTitle"></p>
+      <p class="surface-copy" id="welcomeCopy"></p>
+      <div class="welcome-steps" id="welcomeSteps"></div>
+      <div class="spotlight-actions">
+        <button class="action-btn" id="startWelcomeBtn" type="button"></button>
+        <button class="action-btn ghost" id="closeWelcomeBtn" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

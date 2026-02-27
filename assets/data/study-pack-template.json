@@ -1,0 +1,62 @@
+{
+  "uk": {
+    "theory": [
+      {
+        "id": "custom-topic-1",
+        "topic": "measurement",
+        "icon": "🧩",
+        "title": "Власна тема",
+        "lead": "Короткий вступ до теми.",
+        "intro": [
+          "Перший абзац теорії.",
+          "Другий абзац теорії."
+        ],
+        "table": {
+          "headers": ["Колонка 1", "Колонка 2"],
+          "rows": [
+            ["A", "B"]
+          ]
+        },
+        "highlight": "Корисний акцент."
+      }
+    ],
+    "flashcards": [
+      {
+        "id": "custom-fc-1",
+        "topic": "measurement",
+        "term": "Власний термін",
+        "def": "Власне пояснення"
+      }
+    ],
+    "practiceProblems": [
+      {
+        "id": "custom-pp-1",
+        "topic": "measurement",
+        "prompt": "Власна задача",
+        "answer": 12,
+        "tolerance": 0.1,
+        "explanation": "Пояснення розв'язку"
+      }
+    ],
+    "quizData": [
+      {
+        "id": "custom-qq-1",
+        "topic": "measurement",
+        "q": "Власне питання?",
+        "opts": ["A", "B", "C", "D"],
+        "correct": 0,
+        "explanation": "Чому це правильна відповідь"
+      }
+    ],
+    "checklistItems": [
+      "Я розумію власну тему."
+    ]
+  },
+  "de": {
+    "theory": [],
+    "flashcards": [],
+    "practiceProblems": [],
+    "quizData": [],
+    "checklistItems": []
+  }
+}
