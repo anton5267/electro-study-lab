@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}\ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ format('{0}/.playwright-browsers', github.workspace) }}
 
     steps:
       - name: Checkout repository
