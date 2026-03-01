@@ -2,11 +2,204 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const CUSTOM_COLLECTION_KEYS = ["theory", "flashcards", "practiceProblems", "quizData", "checklistItems"];
+const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const HTML_TAG_PATTERN = /<[^>]*>/g;
+
+function cleanPlainText(value, maxLength = 1200) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(CONTROL_CHAR_PATTERN, "")
+    .replace(HTML_TAG_PATTERN, "")
+    .replace(/\r\n?/g, "\n")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function cleanStringArray(value, maxLength = 1200) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => cleanPlainText(item, maxLength))
+    .filter((item) => item.length > 0);
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function toQuizOptions(value) {
+  const options = cleanStringArray(value, 600).slice(0, 4);
+  while (options.length < 4) {
+    options.push("");
+  }
+  return options;
+}
+
+function sanitizeTheoryItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+
+  const sanitized = {
+    id: cleanPlainText(item.id, 120),
+    topic: cleanPlainText(item.topic, 80),
+    icon: cleanPlainText(item.icon, 24),
+    title: cleanPlainText(item.title, 320),
+    lead: cleanPlainText(item.lead, 1000),
+    intro: cleanStringArray(item.intro, 1800)
+  };
+
+  if (item.table && typeof item.table === "object" && !Array.isArray(item.table)) {
+    const headers = cleanStringArray(item.table.headers, 220);
+    const rows = Array.isArray(item.table.rows)
+      ? item.table.rows
+        .filter((row) => Array.isArray(row))
+        .map((row) => cleanStringArray(row, 300))
+        .filter((row) => row.length > 0)
+      : [];
+
+    if (headers.length || rows.length) {
+      sanitized.table = { headers, rows };
+    }
+  }
+
+  if (item.diagram && typeof item.diagram === "object" && !Array.isArray(item.diagram)) {
+    const type = item.diagram.type === "cross" ? "cross" : "spar";
+    const hotspots = Array.isArray(item.diagram.hotspots)
+      ? item.diagram.hotspots
+        .filter((hotspot) => hotspot && typeof hotspot === "object" && !Array.isArray(hotspot))
+        .map((hotspot) => ({
+          label: cleanPlainText(hotspot.label, 160),
+          text: cleanPlainText(hotspot.text, 900)
+        }))
+        .filter((hotspot) => hotspot.label && hotspot.text)
+      : [];
+
+    if (hotspots.length) {
+      sanitized.diagram = { type, hotspots };
+    }
+  }
+
+  const highlight = cleanPlainText(item.highlight, 900);
+  if (highlight) {
+    sanitized.highlight = highlight;
+  }
+
+  const danger = cleanPlainText(item.danger, 900);
+  if (danger) {
+    sanitized.danger = danger;
+  }
+
+  return sanitized.id ? sanitized : null;
+}
+
+function sanitizeFlashcardItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+
+  const sanitized = {
+    id: cleanPlainText(item.id, 120),
+    topic: cleanPlainText(item.topic, 80),
+    term: cleanPlainText(item.term, 360),
+    def: cleanPlainText(item.def, 1200)
+  };
+
+  return sanitized.id ? sanitized : null;
+}
+
+function sanitizePracticeItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+
+  const sanitized = {
+    id: cleanPlainText(item.id, 120),
+    topic: cleanPlainText(item.topic, 80),
+    prompt: cleanPlainText(item.prompt, 1000),
+    answer: toFiniteNumber(item.answer, 0),
+    tolerance: Math.max(0, toFiniteNumber(item.tolerance, 0)),
+    explanation: cleanPlainText(item.explanation, 1000)
+  };
+
+  return sanitized.id ? sanitized : null;
+}
+
+function sanitizeQuizItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+
+  const numericCorrect = Number(item.correct);
+  const correct = Number.isInteger(numericCorrect) ? Math.min(3, Math.max(0, numericCorrect)) : 0;
+
+  const sanitized = {
+    id: cleanPlainText(item.id, 120),
+    topic: cleanPlainText(item.topic, 80),
+    q: cleanPlainText(item.q, 1000),
+    opts: toQuizOptions(item.opts),
+    correct,
+    explanation: cleanPlainText(item.explanation, 1000)
+  };
+
+  return sanitized.id ? sanitized : null;
+}
+
+function sanitizeLanguagePack(languagePack = {}) {
+  const sanitized = {};
+
+  if (Array.isArray(languagePack.theory)) {
+    sanitized.theory = languagePack.theory.map(sanitizeTheoryItem).filter(Boolean);
+  }
+
+  if (Array.isArray(languagePack.flashcards)) {
+    sanitized.flashcards = languagePack.flashcards.map(sanitizeFlashcardItem).filter(Boolean);
+  }
+
+  if (Array.isArray(languagePack.practiceProblems)) {
+    sanitized.practiceProblems = languagePack.practiceProblems.map(sanitizePracticeItem).filter(Boolean);
+  }
+
+  if (Array.isArray(languagePack.quizData)) {
+    sanitized.quizData = languagePack.quizData.map(sanitizeQuizItem).filter(Boolean);
+  }
+
+  if (Array.isArray(languagePack.checklistItems)) {
+    sanitized.checklistItems = cleanStringArray(languagePack.checklistItems, 600);
+  }
+
+  return sanitized;
+}
+
+export function sanitizeCustomPack(customPack = null) {
+  if (!customPack || typeof customPack !== "object" || Array.isArray(customPack)) {
+    return null;
+  }
+
+  const sanitized = {};
+
+  if (customPack.uk && typeof customPack.uk === "object" && !Array.isArray(customPack.uk)) {
+    sanitized.uk = sanitizeLanguagePack(customPack.uk);
+  }
+
+  if (customPack.de && typeof customPack.de === "object" && !Array.isArray(customPack.de)) {
+    sanitized.de = sanitizeLanguagePack(customPack.de);
+  }
+
+  return Object.keys(sanitized).length ? sanitized : null;
+}
+
 function mergeLanguage(baseLanguage, customLanguage = {}) {
   const merged = deepClone(baseLanguage);
-  const arrayKeys = ["theory", "flashcards", "practiceProblems", "quizData", "checklistItems"];
 
-  arrayKeys.forEach((key) => {
+  CUSTOM_COLLECTION_KEYS.forEach((key) => {
     if (Array.isArray(customLanguage[key]) && customLanguage[key].length) {
       merged[key] = [...merged[key], ...customLanguage[key]];
     }
@@ -16,13 +209,15 @@ function mergeLanguage(baseLanguage, customLanguage = {}) {
 }
 
 export function buildContentPack(customPack = null) {
-  if (!customPack || typeof customPack !== "object") {
+  const sanitizedCustomPack = sanitizeCustomPack(customPack);
+
+  if (!sanitizedCustomPack) {
     return deepClone(BASE_CONTENT);
   }
 
   return {
-    uk: mergeLanguage(BASE_CONTENT.uk, customPack.uk),
-    de: mergeLanguage(BASE_CONTENT.de, customPack.de)
+    uk: mergeLanguage(BASE_CONTENT.uk, sanitizedCustomPack.uk),
+    de: mergeLanguage(BASE_CONTENT.de, sanitizedCustomPack.de)
   };
 }
 
@@ -256,7 +451,8 @@ export const BASE_CONTENT = {
       cleared: "Користувацький пакет видалено.",
       invalid: "Файл не схожий на коректний пакет контенту.",
       backupImported: "Резервну копію прогресу успішно відновлено.",
-      backupInvalid: "Файл резервної копії має некоректний формат."
+      backupInvalid: "Файл резервної копії має некоректний формат.",
+      tooLarge: "Файл завеликий для імпорту. Максимум 1 MB."
     },
     toasts: {
       saved: "Зміни збережено локально.",
@@ -696,7 +892,8 @@ export const BASE_CONTENT = {
       cleared: "Das eigene Paket wurde entfernt.",
       invalid: "Die Datei sieht nicht wie ein gültiges Inhaltspaket aus.",
       backupImported: "Die Fortschrittssicherung wurde erfolgreich wiederhergestellt.",
-      backupInvalid: "Die Sicherungsdatei hat kein gültiges Format."
+      backupInvalid: "Die Sicherungsdatei hat kein gültiges Format.",
+      tooLarge: "Die Datei ist zu groß für den Import. Maximum 1 MB."
     },
     toasts: {
       saved: "Änderungen wurden lokal gespeichert.",
