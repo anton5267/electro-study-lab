@@ -2,6 +2,14 @@
 
 All notable changes to this project should be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Security automation baseline for repository maintenance:
+  - Dependabot configuration for `npm` and `github-actions`.
+  - `gitleaks` configuration and CI workflow for secret scanning on pushes and pull requests.
+
 ## [1.0.0] - 2026-02-27
 
 ### Added

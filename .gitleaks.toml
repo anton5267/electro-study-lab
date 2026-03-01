@@ -1,0 +1,9 @@
+title = "electro-study-lab gitleaks config"
+
+[allowlist]
+description = "General allowlist for generated and baseline artifacts"
+paths = [
+  '''qa/visual-baselines/''',
+  '''dist/''',
+  '''artifacts/'''
+]
