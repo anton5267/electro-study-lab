@@ -21,6 +21,10 @@ All notable changes to this project should be documented in this file.
   - Rejected HTML markup in custom-pack validation fields to reduce XSS risk.
   - Added max import file size guard (`1 MB`) for pack/backup imports with localized error messages.
 - Added CSP meta policy in `index.html` to restrict script/object/frame sources.
+- Refactored UI update orchestration in `app.js`:
+  - Added centralized view-render helpers (`renderViews`, `rerender*` helpers).
+  - Replaced duplicated multi-render blocks in search/topic/quiz/exam/checklist/practice flows.
+  - Standardized URL/view-state synchronization through shared helper.
 
 ## [1.0.0] - 2026-02-27
 
