@@ -167,6 +167,8 @@ function validateTheory(items, language, baseLanguage, errors) {
 
     if (!Array.isArray(item.intro) || !item.intro.length || item.intro.some((part) => typeof part !== "string")) {
       errors.push(`${label}.intro must be a non-empty string array.`);
+    } else if (item.intro.some((part) => containsHtmlMarkup(part))) {
+      errors.push(`${label}.intro must not contain HTML tags.`);
     }
 
     if (item.table !== undefined) {
@@ -175,10 +177,14 @@ function validateTheory(items, language, baseLanguage, errors) {
       } else {
         if (!Array.isArray(item.table.headers) || !item.table.headers.length || item.table.headers.some((value) => typeof value !== "string")) {
           errors.push(`${label}.table.headers must be a non-empty string array.`);
+        } else if (item.table.headers.some((value) => containsHtmlMarkup(value))) {
+          errors.push(`${label}.table.headers must not contain HTML tags.`);
         }
 
         if (!Array.isArray(item.table.rows) || item.table.rows.some((row) => !Array.isArray(row) || row.some((cell) => typeof cell !== "string"))) {
           errors.push(`${label}.table.rows must be an array of string arrays.`);
+        } else if (item.table.rows.some((row) => row.some((cell) => containsHtmlMarkup(cell)))) {
+          errors.push(`${label}.table.rows must not contain HTML tags.`);
         }
       }
     }
@@ -197,6 +203,8 @@ function validateTheory(items, language, baseLanguage, errors) {
           item.diagram.hotspots.some((hotspot) => !hotspot || typeof hotspot.label !== "string" || typeof hotspot.text !== "string")
         ) {
           errors.push(`${label}.diagram.hotspots must be a non-empty array of { label, text } objects.`);
+        } else if (item.diagram.hotspots.some((hotspot) => containsHtmlMarkup(hotspot.label) || containsHtmlMarkup(hotspot.text))) {
+          errors.push(`${label}.diagram.hotspots must not contain HTML tags.`);
         }
       }
     }
@@ -243,6 +251,8 @@ function validateQuizData(items, language, baseLanguage, errors) {
 
     if (!Array.isArray(item.opts) || item.opts.length !== 4 || item.opts.some((option) => typeof option !== "string")) {
       errors.push(`${label}.opts must be an array of 4 strings.`);
+    } else if (item.opts.some((option) => containsHtmlMarkup(option))) {
+      errors.push(`${label}.opts must not contain HTML tags.`);
     }
 
     if (!Number.isInteger(item.correct) || item.correct < 0 || item.correct > 3) {
@@ -257,6 +267,8 @@ function validateChecklist(items, language, errors) {
   items.forEach((item, index) => {
     if (typeof item !== "string" || !item.trim()) {
       errors.push(`${language}.checklistItems[${index}] must be a non-empty string.`);
+    } else if (containsHtmlMarkup(item)) {
+      errors.push(`${language}.checklistItems[${index}] must not contain HTML tags.`);
     }
   });
 }
@@ -406,12 +418,26 @@ function validateTopic(value, label, topicLabels, errors) {
 function validateRequiredString(value, label, errors) {
   if (typeof value !== "string" || !value.trim()) {
     errors.push(`${label} must be a non-empty string.`);
+    return;
+  }
+
+  if (containsHtmlMarkup(value)) {
+    errors.push(`${label} must not contain HTML tags.`);
   }
 }
 
 function validateOptionalString(value, label, errors) {
-  if (value !== undefined && (typeof value !== "string" || !value.trim())) {
+  if (value === undefined) {
+    return;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
     errors.push(`${label} must be a non-empty string when provided.`);
+    return;
+  }
+
+  if (containsHtmlMarkup(value)) {
+    errors.push(`${label} must not contain HTML tags.`);
   }
 }
 
@@ -437,4 +463,8 @@ function assertObject(value, label, errors) {
   if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) {
     errors.push(`${label} must be an object.`);
   }
+}
+
+function containsHtmlMarkup(value) {
+  return /<[^>]*>/.test(value);
 }

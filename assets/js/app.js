@@ -1,4 +1,4 @@
-import { BASE_CONTENT, buildContentPack } from "./modules/content.js";
+import { BASE_CONTENT, buildContentPack, sanitizeCustomPack } from "./modules/content.js";
 import {
   createDefaultStats,
   getStorageKey,
@@ -95,6 +95,7 @@ import {
 } from "./modules/utils.js";
 
 const SECTION_IDS = ["overview", "theory", "flashcards", "practice", "quiz", "exam", "checklist", "analytics"];
+const MAX_IMPORT_FILE_SIZE_BYTES = 1 * 1024 * 1024;
 
 const dom = {
   badge: document.getElementById("badge"),
@@ -244,7 +245,7 @@ restoreRuntimeState({ notify: true });
 renderApp();
 
 function createInitialState() {
-  const customPack = loadJson(getStorageKey("customPack"), null);
+  const customPack = sanitizeCustomPack(loadJson(getStorageKey("customPack"), null));
   const contentPack = buildContentPack(customPack);
   const storedLanguage = loadJson(getStorageKey("language"), "uk");
   const storedViewState = loadJson(getStorageKey("viewState"), {});
@@ -1457,6 +1458,12 @@ function handleImportProgress(event) {
     return;
   }
 
+  if (isImportFileTooLarge(file)) {
+    showToast(getContent().importMessages.tooLarge, "warning");
+    dom.importProgressInput.value = "";
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -1485,6 +1492,12 @@ function handleImportPack(event) {
     return;
   }
 
+  if (isImportFileTooLarge(file)) {
+    showToast(getContent().importMessages.tooLarge, "warning");
+    dom.importPackInput.value = "";
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -1495,8 +1508,9 @@ function handleImportPack(event) {
         return;
       }
 
-      state.customPack = parsed;
-      saveJson(getStorageKey("customPack"), parsed);
+      const sanitizedPack = sanitizeCustomPack(parsed);
+      state.customPack = sanitizedPack;
+      saveJson(getStorageKey("customPack"), sanitizedPack);
       rebuildContentPack();
       showToast(getContent().importMessages.success, "success");
     } catch (error) {
@@ -1512,10 +1526,16 @@ function handleImportPack(event) {
 function applyBackupPayload(payload) {
   clearExamTimer();
 
-  state.contentPack = buildContentPack(payload.customPack ?? null);
+  const sanitizedCustomPack = sanitizeCustomPack(payload.customPack ?? null);
+  const sanitizedPayload = {
+    ...payload,
+    customPack: sanitizedCustomPack
+  };
+
+  state.contentPack = buildContentPack(sanitizedCustomPack);
   Object.assign(
     state,
-    createImportedBackupState(payload, state.contentPack, state.lang, SECTION_IDS, hydrateExamState)
+    createImportedBackupState(sanitizedPayload, state.contentPack, state.lang, SECTION_IDS, hydrateExamState)
   );
 
   saveJson(getStorageKey("customPack"), state.customPack);
@@ -1663,6 +1683,10 @@ function formatImportError(prefix, errors) {
   }
 
   return `${prefix} ${errors[0]}`;
+}
+
+function isImportFileTooLarge(file) {
+  return Number(file?.size) > MAX_IMPORT_FILE_SIZE_BYTES;
 }
 
 function syncUrlState() {

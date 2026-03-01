@@ -55,6 +55,25 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
 }
 
 {
+  const htmlPack = {
+    uk: {
+      flashcards: [
+        {
+          id: "custom-fc-unsafe",
+          topic: "measurement",
+          term: "<img src=x onerror=alert(1)>",
+          def: "safe"
+        }
+      ]
+    }
+  };
+
+  const result = validateCustomPack(htmlPack, BASE_CONTENT);
+  assert.equal(result.valid, false);
+  assert(result.errors.some((message) => message.includes("must not contain HTML tags")));
+}
+
+{
   const customPack = {
     uk: {
       theory: [
@@ -180,6 +199,28 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
   assert(result.errors.some((message) => message.includes('quizMode')));
   assert(result.errors.some((message) => message.includes("score must be a number")));
   assert(result.errors.some((message) => message.includes("wrongQuestionIds")));
+}
+
+{
+  const unsafeLegacyPack = {
+    uk: {
+      flashcards: [
+        {
+          id: "legacy-fc-1",
+          topic: "measurement",
+          term: "<script>alert(1)</script>Voltage",
+          def: "<b>Unsafe</b> content"
+        }
+      ]
+    }
+  };
+
+  const contentPack = buildContentPack(unsafeLegacyPack);
+  const importedCard = contentPack.uk.flashcards.find((item) => item.id === "legacy-fc-1");
+
+  assert(importedCard);
+  assert.equal(importedCard.term.includes("<"), false);
+  assert.equal(importedCard.def.includes("<"), false);
 }
 
 console.log("Validation tests passed.");

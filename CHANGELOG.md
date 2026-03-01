@@ -9,6 +9,18 @@ All notable changes to this project should be documented in this file.
 - Security automation baseline for repository maintenance:
   - Dependabot configuration for `npm` and `github-actions`.
   - `gitleaks` configuration and CI workflow for secret scanning on pushes and pull requests.
+- `SECURITY.md` with disclosure process and response targets.
+- GitHub admin scripts for reproducible security setup:
+  - `scripts/github/enable-security-analysis.ps1`
+  - `scripts/github/apply-branch-protection.ps1`
+
+### Changed
+
+- Hardened custom content import pipeline:
+  - Added sanitization for imported custom packs before merge/render.
+  - Rejected HTML markup in custom-pack validation fields to reduce XSS risk.
+  - Added max import file size guard (`1 MB`) for pack/backup imports with localized error messages.
+- Added CSP meta policy in `index.html` to restrict script/object/frame sources.
 
 ## [1.0.0] - 2026-02-27
 

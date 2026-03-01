@@ -87,7 +87,9 @@ async function assertPrintView(page) {
 }
 
 async function auditDesktop(browser) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    bypassCSP: true
+  });
   const page = await context.newPage();
   await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
   await dismissWelcomeModal(page);
@@ -99,7 +101,8 @@ async function auditDesktop(browser) {
 async function auditMobile(browser) {
   const context = await browser.newContext({
     ...devices["iPhone 13"],
-    isMobile: true
+    isMobile: true,
+    bypassCSP: true
   });
   const page = await context.newPage();
   await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
