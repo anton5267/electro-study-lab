@@ -358,19 +358,12 @@ function bindEvents() {
 }
 
 function renderApp() {
-  renderStaticText();
-  renderOverview();
-  renderTheory();
-  renderFlashcards(true);
-  renderPractice();
-  renderQuiz();
-  renderExam();
-  renderChecklist();
-  renderAnalytics();
-  updateProgress();
+  renderViews(
+    ["static", "overview", "theory", "flashcards", "practice", "quiz", "exam", "checklist", "analytics", "progress"],
+    { resetFlashcards: true }
+  );
   showSection(state.activeSection, false);
-  syncUrlState();
-  persistViewState();
+  refreshUrlAndViewState();
   maybeShowOnboarding();
 }
 
@@ -784,6 +777,69 @@ function updateProgress() {
   dom.metricAccuracyValue.textContent = accuracyValues.length ? `${Math.round(average(accuracyValues))}%` : "—";
 }
 
+function renderViews(viewIds, { resetFlashcards = false } = {}) {
+  [...new Set(viewIds)].forEach((viewId) => {
+    switch (viewId) {
+      case "static":
+        renderStaticText();
+        break;
+      case "topicFilters":
+        renderTopicFilters(getContent());
+        break;
+      case "overview":
+        renderOverview();
+        break;
+      case "theory":
+        renderTheory();
+        break;
+      case "flashcards":
+        renderFlashcards(resetFlashcards);
+        break;
+      case "practice":
+        renderPractice();
+        break;
+      case "quiz":
+        renderQuiz();
+        break;
+      case "exam":
+        renderExam();
+        break;
+      case "checklist":
+        renderChecklist();
+        break;
+      case "analytics":
+        renderAnalytics();
+        break;
+      case "progress":
+        updateProgress();
+        break;
+      default:
+        break;
+    }
+  });
+}
+
+function refreshUrlAndViewState() {
+  syncUrlState();
+  persistViewState();
+}
+
+function rerenderSearchDependentViews() {
+  renderViews(["overview", "theory", "flashcards", "practice", "checklist"], { resetFlashcards: true });
+  refreshUrlAndViewState();
+}
+
+function rerenderTopicDependentViews() {
+  renderViews(["topicFilters", "overview", "theory", "flashcards", "practice", "quiz", "checklist", "analytics"], {
+    resetFlashcards: true
+  });
+  refreshUrlAndViewState();
+}
+
+function rerenderProgressDependentViews({ includeAnalytics = true } = {}) {
+  renderViews(includeAnalytics ? ["progress", "overview", "analytics"] : ["progress", "overview"]);
+}
+
 function showSection(sectionId, updateHash = true) {
   if (!SECTION_IDS.includes(sectionId)) {
     sectionId = "overview";
@@ -825,13 +881,7 @@ function setLanguage(language) {
 function handleSearchInput(event) {
   state.searchQuery = event.target.value || "";
   state.currentCard = 0;
-  renderOverview();
-  renderTheory();
-  renderFlashcards(true);
-  renderPractice();
-  renderChecklist();
-  syncUrlState();
-  persistViewState();
+  rerenderSearchDependentViews();
 }
 
 function handleNavTabKeydown(event) {
@@ -870,28 +920,13 @@ function handleTopicFilterClick(event) {
 
   state.activeTopic = button.dataset.topicFilter;
   state.currentCard = 0;
-  renderStaticText();
-  renderOverview();
-  renderTheory();
-  renderFlashcards(true);
-  renderPractice();
-  renderQuiz();
-  renderChecklist();
-  renderAnalytics();
-  syncUrlState();
-  persistViewState();
+  rerenderTopicDependentViews();
 }
 
 function clearSearch() {
   state.searchQuery = "";
   dom.searchInput.value = "";
-  renderOverview();
-  renderTheory();
-  renderFlashcards(true);
-  renderPractice();
-  renderChecklist();
-  syncUrlState();
-  persistViewState();
+  rerenderSearchDependentViews();
 }
 
 function handleTheoryClick(event) {
@@ -925,9 +960,7 @@ function flipFlashcard() {
     state.seenCards.add(actualIndex);
     saveJson(getStorageKey("seenCards"), [...state.seenCards]);
     noteStudyProgress();
-    updateProgress();
-    renderOverview();
-    renderAnalytics();
+    rerenderProgressDependentViews();
   }
 }
 
@@ -995,10 +1028,8 @@ function checkPracticeProblem(problemId) {
   }
 
   noteStudyProgress();
-  renderPractice();
-  updateProgress();
-  renderOverview();
-  renderAnalytics();
+  renderViews(["practice"]);
+  rerenderProgressDependentViews();
 }
 
 function getPracticeResult(problemId, problem) {
@@ -1053,9 +1084,8 @@ function handleQuizClick(event) {
 function generateQuizVariant() {
   Object.assign(state, createQuizVariantState(getContent(), shuffleArray));
   persistQuizState();
-  renderQuiz();
-  updateProgress();
-  renderOverview();
+  renderViews(["quiz"]);
+  rerenderProgressDependentViews({ includeAnalytics: false });
   showSection("quiz");
 }
 
@@ -1102,9 +1132,7 @@ function finalizeQuizSession(questions) {
 
   recordSession("quiz", outcome.score, questions.length, getQuizSessionLabel());
   state.quizLogged = true;
-  updateProgress();
-  renderOverview();
-  renderAnalytics();
+  rerenderProgressDependentViews();
 }
 
 function handleExamIntroClick(event) {
@@ -1188,10 +1216,8 @@ function submitExam(timeout) {
     answers: { ...state.exam.answers }
   }, timeout);
 
-  renderExam();
-  renderOverview();
-  renderAnalytics();
-  updateProgress();
+  renderViews(["exam"]);
+  rerenderProgressDependentViews();
 }
 
 function clearExamTimer() {
@@ -1205,17 +1231,15 @@ function completeChecklist() {
   state.checked = new Set(createSequence(getContent().checklistItems.length));
   saveJson(getStorageKey("checklist"), [...state.checked]);
   noteStudyProgress();
-  renderChecklist();
-  updateProgress();
-  renderOverview();
+  renderViews(["checklist"]);
+  rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function resetChecklist() {
   state.checked.clear();
   saveJson(getStorageKey("checklist"), []);
-  renderChecklist();
-  updateProgress();
-  renderOverview();
+  renderViews(["checklist"]);
+  rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function handleChecklistClick(event) {
@@ -1233,9 +1257,8 @@ function handleChecklistClick(event) {
 
   saveJson(getStorageKey("checklist"), [...state.checked]);
   noteStudyProgress();
-  renderChecklist();
-  updateProgress();
-  renderOverview();
+  renderViews(["checklist"]);
+  rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function handleJumpButtons(event) {
@@ -1614,10 +1637,8 @@ function resetPractice() {
   saveJson(getStorageKey("practiceSolved"), []);
   state.stats.practiceSolvedCount = 0;
   persistStats();
-  renderPractice();
-  renderOverview();
-  renderAnalytics();
-  updateProgress();
+  renderViews(["practice"]);
+  rerenderProgressDependentViews();
 }
 
 function resetAllProgress() {
