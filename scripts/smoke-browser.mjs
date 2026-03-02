@@ -141,6 +141,11 @@ try {
   await dismissWelcomeModal(page);
   await waitForActiveSection(page, "overview");
 
+  await page.goto(`${baseUrl}/index.html?lang=uk&topic=measurement#theory`, { waitUntil: "networkidle" });
+  await waitForActiveSection(page, "theory");
+  await page.reload({ waitUntil: "networkidle" });
+  await waitForActiveSection(page, "theory");
+
   await page.locator('#languageSwitcher [data-lang="de"]').click();
   await page.waitForFunction(() => document.documentElement.lang === "de");
 
@@ -218,6 +223,26 @@ try {
   await page.locator("#tabOverview").click();
   await waitForActiveSection(page, "overview");
 
+  const backupActionLabels = await page.$$eval("#exportProgressBtn, #importProgressBtn", (nodes) => (
+    nodes.map((node) => node.textContent?.trim() || "")
+  ));
+  assertVisible(
+    backupActionLabels.every((label) => label.length > 0 && !label.includes("undefined")),
+    "Backup action buttons must have visible labels."
+  );
+
+  await page.locator("#tabFlashcards").click();
+  await waitForActiveSection(page, "flashcards");
+  await page.waitForFunction(() => Boolean(document.getElementById("fcTerm")?.textContent?.trim()));
+  const flashcardUiText = await page.$$eval(
+    "#shuffleCardsBtn, #prevCardBtn, #flipCardBtn, #nextCardBtn, #flashcardStatus",
+    (nodes) => nodes.map((node) => node.textContent?.trim() || "")
+  );
+  assertVisible(
+    flashcardUiText.every((value) => value.length > 0 && !value.includes("undefined")),
+    "Flashcard controls/status should never render undefined labels."
+  );
+
   await page.waitForFunction(() => window.location.search.includes("topic=measurement"));
   await page.locator("#reviewNowBtn").click();
   await waitForActiveSection(page, "quiz");
@@ -225,6 +250,28 @@ try {
 
   const reviewQuestionCount = await page.locator(".quiz-card").count();
   assertVisible(reviewQuestionCount >= 1, "Adaptive review mode did not open a review quiz.");
+
+  await page.locator('[data-topic-filter="measurement"]').click();
+  await page.waitForFunction(() => window.location.search.includes("topic=measurement"));
+  await page.locator("#tabExam").click();
+  await waitForActiveSection(page, "exam");
+  await page.locator('[data-start-exam="true"]').click();
+  await page.locator('[data-submit-exam="true"]').waitFor();
+  await page.waitForFunction(() => {
+    const labels = Array.from(document.querySelectorAll(".exam-question .topic-chip"))
+      .map((node) => node.textContent?.trim())
+      .filter(Boolean);
+    return labels.length > 0;
+  });
+  const examTopicLabels = await page.$$eval(".exam-question .topic-chip", (nodes) => (
+    nodes.map((node) => node.textContent?.trim() || "")
+  ));
+  assertVisible(
+    examTopicLabels.every((label) => label === "Розрахунки"),
+    "Measurement-scoped exam should include only measurement topic questions."
+  );
+  await page.locator('[data-submit-exam="true"]').click();
+  await page.locator('[data-reset-exam="true"]').click();
 
   console.log("Browser smoke test passed.");
 } finally {
