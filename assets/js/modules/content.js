@@ -349,7 +349,7 @@ export const BASE_CONTENT = {
       emptyReview: "Поки що черга повторення порожня. Вона з'явиться після помилок у квізі або екзамені.",
       noResults: "Нічого не знайдено за цим запитом."
     },
-    flashcards: {
+    flashcardsUi: {
       shuffle: "Перемішати",
       previous: "← Назад",
       next: "Далі →",
@@ -799,7 +799,7 @@ export const BASE_CONTENT = {
       emptyReview: "Noch keine Wiederholungseinträge. Sie entstehen nach Fehlern im Quiz oder Prüfungsmodus.",
       noResults: "Zu dieser Suche wurde nichts gefunden."
     },
-    flashcards: {
+    flashcardsUi: {
       shuffle: "Mischen",
       previous: "← Zurück",
       next: "Weiter →",

@@ -28,13 +28,13 @@ export function resolveExamTickAction(examState, now = Date.now()) {
   return EXAM_TICK_ACTIONS.RENDER;
 }
 
-export function buildStartedExamState(createRunningExamState, content, questionCount, durationMinutes, now, shuffleArray, timerId) {
+export function buildStartedExamState(createRunningExamState, content, questionCount, durationMinutes, now, shuffleArray, timerId, activeTopic = "all") {
   if (typeof createRunningExamState !== "function") {
     return null;
   }
 
   return {
-    ...createRunningExamState(content, questionCount, durationMinutes, now, shuffleArray),
+    ...createRunningExamState(content, questionCount, durationMinutes, now, shuffleArray, activeTopic),
     timerId: timerId ?? null
   };
 }

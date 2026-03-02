@@ -318,6 +318,10 @@ await check("Base content parity", async () => {
   languages.forEach((language) => {
     const content = BASE_CONTENT[language];
     assert(content && typeof content === "object", `Missing language pack: ${language}`);
+    assert(content.flashcardsUi && typeof content.flashcardsUi === "object", `${language}.flashcardsUi must be an object.`);
+    ["shuffle", "previous", "next", "flip", "frontHint", "backHint", "counter", "status"].forEach((key) => {
+      assert(typeof content.flashcardsUi[key] === "string", `${language}.flashcardsUi.${key} must be a string.`);
+    });
 
     arrayCollections.forEach((collectionName) => {
       assert(Array.isArray(content[collectionName]), `${language}.${collectionName} must be an array.`);

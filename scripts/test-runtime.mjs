@@ -127,6 +127,42 @@ function createEmptyExamState() {
 }
 
 {
+  const withHash = resolveInitialViewState(
+    "http://localhost:4173/index.html?lang=uk#Theory",
+    {
+      activeSection: "practice",
+      activeTopic: "safety",
+      searchQuery: "schutz",
+      currentCard: 0,
+      diagramSelections: {}
+    },
+    contentPack,
+    "uk",
+    SECTION_IDS
+  );
+
+  assert.equal(withHash.activeSection, "theory");
+}
+
+{
+  const withInvalidHash = resolveInitialViewState(
+    "http://localhost:4173/index.html?lang=uk#unknown",
+    {
+      activeSection: "practice",
+      activeTopic: "safety",
+      searchQuery: "schutz",
+      currentCard: 0,
+      diagramSelections: {}
+    },
+    contentPack,
+    "uk",
+    SECTION_IDS
+  );
+
+  assert.equal(withInvalidHash.activeSection, "practice");
+}
+
+{
   const snapshot = buildViewStateSnapshot({
     activeSection: "theory",
     activeTopic: "switching",

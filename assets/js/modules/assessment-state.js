@@ -62,9 +62,16 @@ export function createEmptyExamState() {
   };
 }
 
-export function createRunningExamState(content, questionCount, durationMinutes, now, shuffleArray) {
-  const questionIds = shuffleArray(content.quizData.map((question) => question.id))
-    .slice(0, Math.min(questionCount, content.quizData.length));
+export function createRunningExamState(content, questionCount, durationMinutes, now, shuffleArray, activeTopic = "all") {
+  const allQuestions = Array.isArray(content?.quizData) ? content.quizData : [];
+  const topicQuestions = activeTopic === "all"
+    ? allQuestions
+    : allQuestions.filter((question) => question.topic === activeTopic);
+  const sourceQuestions = topicQuestions.length ? topicQuestions : allQuestions;
+  const questionIds = (typeof shuffleArray === "function"
+    ? shuffleArray(sourceQuestions.map((question) => question.id))
+    : sourceQuestions.map((question) => question.id))
+    .slice(0, Math.min(questionCount, sourceQuestions.length));
 
   return {
     ...createEmptyExamState(),

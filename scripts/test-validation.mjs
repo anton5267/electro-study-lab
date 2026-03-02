@@ -4,6 +4,16 @@ import { BASE_CONTENT, buildContentPack } from "../assets/js/modules/content.js"
 import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/validation.js";
 
 {
+  ["uk", "de"].forEach((language) => {
+    const content = BASE_CONTENT[language];
+    assert(Array.isArray(content.flashcards), `${language}.flashcards must remain an array.`);
+    assert(content.flashcardsUi && typeof content.flashcardsUi === "object", `${language}.flashcardsUi must be an object.`);
+    assert.equal(typeof content.flashcardsUi.counter, "string");
+    assert.equal(typeof content.flashcardsUi.status, "string");
+  });
+}
+
+{
   const validPack = {
     uk: {
       flashcards: [
