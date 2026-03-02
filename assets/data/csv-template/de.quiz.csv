@@ -1,0 +1,2 @@
+id,topic,q,opt1,opt2,opt3,opt4,correct,explanation
+ext-qq-101,safety,Welche Maßnahme reduziert das Risiko eines Stromunfalls am besten?,Ohne PE arbeiten,Einen RCD mit 30 mA einsetzen,Größeren Leitungsschutzschalter wählen,Feuchtigkeit ignorieren,1,Ein 30-mA-RCD trennt den Stromkreis bei gefährlicher Differenz schnell ab.

@@ -6,6 +6,13 @@
   "scripts": {
     "serve": "node scripts/dev-server.mjs",
     "package": "node scripts/package-site.mjs",
+    "content:report": "node scripts/content-workbench.mjs",
+    "content:gate": "node scripts/content-workbench.mjs --enforce",
+    "content:pack:csv": "node scripts/build-study-pack-from-csv.mjs",
+    "content:validate:pack": "node scripts/validate-custom-pack.mjs",
+    "progress:validate:backup": "node scripts/validate-backup-payload.mjs",
+    "content:export:csv": "node scripts/export-content-to-csv.mjs",
+    "size:check": "node scripts/check-size-budget.mjs",
     "audit:a11y": "node scripts/audit-accessibility.mjs",
     "smoke:http": "node scripts/smoke-http.mjs",
     "smoke:browser": "node scripts/smoke-browser.mjs",
@@ -14,9 +21,11 @@
     "smoke": "npm run smoke:http && npm run smoke:browser",
     "visual:refresh": "node scripts/visual-regression.mjs --update",
     "visual:test": "node scripts/visual-regression.mjs",
-    "test": "node scripts/test-runtime.mjs && node scripts/test-progress-state.mjs && node scripts/test-assessment-state.mjs && node scripts/test-validation.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "test": "node scripts/test-runtime.mjs && node scripts/test-storage.mjs && node scripts/test-dev-server-helpers.mjs && node scripts/test-http-smoke-helpers.mjs && node scripts/test-smoke-checks.mjs && node scripts/test-progress-state.mjs && node scripts/test-assessment-state.mjs && node scripts/test-checklist-state.mjs && node scripts/test-checklist-control.mjs && node scripts/test-flashcard-state.mjs && node scripts/test-practice-state.mjs && node scripts/test-practice-control.mjs && node scripts/test-quiz-control.mjs && node scripts/test-theory-control.mjs && node scripts/test-jump-control.mjs && node scripts/test-keyboard-control.mjs && node scripts/test-nav-control.mjs && node scripts/test-language-control.mjs && node scripts/test-topic-control.mjs && node scripts/test-validation.mjs && node scripts/test-review-planner.mjs && node scripts/test-view-plan.mjs && node scripts/test-progress-metrics.mjs && node scripts/test-exam-intro-control.mjs && node scripts/test-exam-runtime.mjs && node scripts/test-exam-control.mjs && node scripts/test-exam-session.mjs && node scripts/test-quiz-session.mjs && node scripts/test-exam-preferences.mjs && node scripts/test-validate-custom-pack.mjs && node scripts/test-validate-backup-payload.mjs && node scripts/test-content-workbench.mjs && node scripts/test-build-study-pack-from-csv.mjs && node scripts/test-export-content-to-csv.mjs && node scripts/test-content-csv-roundtrip.mjs && node scripts/test-size-budget.mjs",
     "validate": "node scripts/validate-app.mjs",
-    "quality": "npm test && npm run validate && npm run package && npm run smoke && npm run smoke:dist && npm run smoke:dist:browser && npm run audit:a11y && npm run visual:test"
+    "quality:quick": "npm test && npm run validate && npm run content:gate && npm run content:validate:pack && npm run progress:validate:backup && npm run size:check",
+    "quality": "npm test && npm run validate && npm run content:gate && npm run content:validate:pack && npm run progress:validate:backup && npm run size:check && npm run package && npm run smoke && npm run smoke:dist && npm run smoke:dist:browser && npm run audit:a11y && npm run visual:test"
   },
   "devDependencies": {
     "axe-core": "^4.11.1",

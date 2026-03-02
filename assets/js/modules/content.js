@@ -464,7 +464,8 @@ export const BASE_CONTENT = {
       updated: "Застосунок оновлено.",
       linkCopied: "Посилання на поточний стан скопійовано.",
       examRestored: "Незавершений екзамен відновлено після перезавантаження.",
-      copyFailed: "Не вдалося скопіювати посилання автоматично."
+      copyFailed: "Не вдалося скопіювати посилання автоматично.",
+      reviewFocus: "Повторення автоматично сфокусовано на темі: {topic}."
     },
     alerts: {
       resetAll: "Справді скинути весь прогрес, історію та власний пакет?",
@@ -624,7 +625,9 @@ export const BASE_CONTENT = {
       { id: "fc-7", topic: "safety", term: "Для чого потрібен провідник PE?", def: "Щоб струм пошкодження пішов у землю, а не через людину." },
       { id: "fc-8", topic: "switching", term: "Чому імпульсна схема краща для багатьох точок?", def: "Бо всі кнопки просто підключаються паралельно." },
       { id: "fc-9", topic: "measurement", term: "Що показує закон Ома?", def: "Зв'язок між напругою, струмом і опором: I = U / R." },
-      { id: "fc-10", topic: "safety", term: "Що означає SELV?", def: "Безпечна наднизька напруга, яка зменшує ризик небезпечного дотику." }
+      { id: "fc-10", topic: "safety", term: "Що означає SELV?", def: "Безпечна наднизька напруга, яка зменшує ризик небезпечного дотику." },
+      { id: "fc-11", topic: "measurement", term: "Що означає формула P = I^2 * R?", def: "Що потужність втрат на опорі росте з квадратом струму." },
+      { id: "fc-12", topic: "safety", term: "Чому волога шкіра підвищує ризик ураження?", def: "Бо зменшується опір тіла і через людину може пройти більший струм." }
     ],
     practiceProblems: [
       { id: "pp-1", topic: "measurement", prompt: "Обчисли струм при U = 230 V і R = 1000 Ω. Введи значення в амперах.", answer: 0.23, tolerance: 0.005, explanation: "I = U / R = 230 / 1000 = 0,23 A." },
@@ -632,7 +635,9 @@ export const BASE_CONTENT = {
       { id: "pp-3", topic: "measurement", prompt: "При U = 24 V і I = 3 A знайди потужність навантаження у ватах.", answer: 72, tolerance: 0.2, explanation: "P = U · I = 24 · 3 = 72 W." },
       { id: "pp-4", topic: "switching", prompt: "Скільки перехресних вимикачів потрібно для 5 точок керування однією лампою?", answer: 3, tolerance: 0, explanation: "Потрібні 2 прохідні на краях і 3 перехресні посередині." },
       { id: "pp-5", topic: "safety", prompt: "RCD спрацьовує при 30 мА. Введи це значення в амперах.", answer: 0.03, tolerance: 0.001, explanation: "30 мА = 0,03 A." },
-      { id: "pp-6", topic: "switching", prompt: "Скільки провідників використовує економна прохідна схема між точками керування?", answer: 3, tolerance: 0, explanation: "Назва схеми і означає економію до трьох провідників." }
+      { id: "pp-6", topic: "switching", prompt: "Скільки провідників використовує економна прохідна схема між точками керування?", answer: 3, tolerance: 0, explanation: "Назва схеми і означає економію до трьох провідників." },
+      { id: "pp-7", topic: "measurement", prompt: "Знайди опір при U = 230 V та I = 5 A. Введи значення в омах.", answer: 46, tolerance: 0.3, explanation: "R = U / I = 230 / 5 = 46 Ω." },
+      { id: "pp-8", topic: "safety", prompt: "Струм витоку 18 мА, поріг ПЗВ 30 мА. Введи 1 якщо ПЗВ має спрацювати, або 0 якщо ні.", answer: 0, tolerance: 0, explanation: "18 мА менше порогу 30 мА, тому звичайне ПЗВ не повинно спрацювати." }
     ],
     quizData: [
       { id: "qq-1", topic: "safety", q: "Від якої сили струму вже можлива фібриляція шлуночків?", opts: ["10 мА", "50 мА", "150 мА", "300 мА"], correct: 1, explanation: "Діапазон 50–80 мА вже критичний для серця." },
@@ -646,7 +651,11 @@ export const BASE_CONTENT = {
       { id: "qq-9", topic: "safety", q: "Для чого потрібен провідник PE?", opts: ["Для збільшення напруги", "Для відведення струму пошкодження", "Для вимірювання струму", "Для керування освітленням"], correct: 1, explanation: "PE створює безпечний шлях для струму пошкодження." },
       { id: "qq-10", topic: "measurement", q: "Яка потужність при U = 12 V та I = 2 A?", opts: ["6 W", "12 W", "24 W", "48 W"], correct: 2, explanation: "P = U · I = 12 · 2 = 24 W." },
       { id: "qq-11", topic: "switching", q: "Скільки перехресних вимикачів потрібно для 4 точок керування?", opts: ["1", "2", "3", "4"], correct: 1, explanation: "На краях 2 прохідні, посередині 2 перехресні." },
-      { id: "qq-12", topic: "safety", q: "Що небезпечніше для людини: лише висока напруга чи струм через тіло?", opts: ["Лише напруга", "Насамперед струм через тіло", "Тільки опір", "Тільки потужність"], correct: 1, explanation: "Критичний фактор ураження людини це сила струму через тіло." }
+      { id: "qq-12", topic: "safety", q: "Що небезпечніше для людини: лише висока напруга чи струм через тіло?", opts: ["Лише напруга", "Насамперед струм через тіло", "Тільки опір", "Тільки потужність"], correct: 1, explanation: "Критичний фактор ураження людини це сила струму через тіло." },
+      { id: "qq-13", topic: "measurement", q: "Який опір при U = 230 V та I = 5 A?", opts: ["23 Ω", "46 Ω", "115 Ω", "230 Ω"], correct: 1, explanation: "R = U / I = 230 / 5 = 46 Ω." },
+      { id: "qq-14", topic: "switching", q: "Які вимикачі стоять на краях перехресної схеми?", opts: ["Два прохідні вимикачі", "Два перехресні вимикачі", "Два автомати", "Два димери"], correct: 0, explanation: "На краях ставлять саме два прохідні вимикачі, а перехресні розташовують між ними." },
+      { id: "qq-15", topic: "safety", q: "Що треба зробити перед роботою у щитку?", opts: ["Знеструмити коло і перевірити відсутність напруги", "Одягнути рукавиці та працювати під напругою", "Вимкнути лише освітлення в кімнаті", "Торкнутися провідника тильною стороною руки"], correct: 0, explanation: "Базова безпечна послідовність: відключити живлення, перевірити відсутність напруги, зафіксувати стан." },
+      { id: "qq-16", topic: "measurement", q: "Як зміниться струм при незмінному опорі, якщо напругу подвоїти?", opts: ["Подвоїться", "Зменшиться вдвічі", "Не зміниться", "Зросте в чотири рази"], correct: 0, explanation: "За законом Ома I = U / R, отже при сталому R подвоєння U подвоює I." }
     ],
     checklistItems: [
       "Я знаю діапазони струму та їх фізіологічну дію на організм.",
@@ -905,7 +914,8 @@ export const BASE_CONTENT = {
       updated: "Die App wurde aktualisiert.",
       linkCopied: "Link zum aktuellen Lernstand wurde kopiert.",
       examRestored: "Die laufende Prüfung wurde nach dem Neuladen wiederhergestellt.",
-      copyFailed: "Der Link konnte nicht automatisch kopiert werden."
+      copyFailed: "Der Link konnte nicht automatisch kopiert werden.",
+      reviewFocus: "Wiederholung wurde automatisch auf das Thema fokussiert: {topic}."
     },
     alerts: {
       resetAll: "Wirklich Fortschritt, Verlauf und eigenes Paket komplett löschen?",
@@ -1065,7 +1075,9 @@ export const BASE_CONTENT = {
       { id: "fc-7", topic: "safety", term: "Wozu dient der Schutzleiter PE?", def: "Damit der Fehlerstrom sicher abfließen kann und nicht durch den Menschen geht." },
       { id: "fc-8", topic: "switching", term: "Warum ist die Stromstoßschaltung für viele Stellen praktisch?", def: "Weil alle Taster einfach parallel geschaltet werden." },
       { id: "fc-9", topic: "measurement", term: "Was sagt das Ohmsche Gesetz?", def: "Es beschreibt den Zusammenhang von Spannung, Strom und Widerstand: I = U / R." },
-      { id: "fc-10", topic: "safety", term: "Wofür steht SELV?", def: "Für sichere Kleinspannung mit deutlich reduziertem Berührungsrisiko." }
+      { id: "fc-10", topic: "safety", term: "Wofür steht SELV?", def: "Für sichere Kleinspannung mit deutlich reduziertem Berührungsrisiko." },
+      { id: "fc-11", topic: "measurement", term: "Was bedeutet die Formel P = I^2 * R?", def: "Dass die Verlustleistung am Widerstand mit dem Quadrat des Stroms steigt." },
+      { id: "fc-12", topic: "safety", term: "Warum erhöht feuchte Haut das Stromrisiko?", def: "Weil der Körperwiderstand sinkt und dadurch mehr Strom fließen kann." }
     ],
     practiceProblems: [
       { id: "pp-1", topic: "measurement", prompt: "Berechne den Strom bei U = 230 V und R = 1000 Ω. Gib das Ergebnis in Ampere an.", answer: 0.23, tolerance: 0.005, explanation: "I = U / R = 230 / 1000 = 0,23 A." },
@@ -1073,7 +1085,9 @@ export const BASE_CONTENT = {
       { id: "pp-3", topic: "measurement", prompt: "Bei U = 24 V und I = 3 A: Wie groß ist die Leistung in Watt?", answer: 72, tolerance: 0.2, explanation: "P = U · I = 24 · 3 = 72 W." },
       { id: "pp-4", topic: "switching", prompt: "Wie viele Kreuzschalter braucht man für 5 Schaltstellen einer Lampe?", answer: 3, tolerance: 0, explanation: "An den Enden sitzen 2 Wechselschalter, dazwischen 3 Kreuzschalter." },
       { id: "pp-5", topic: "safety", prompt: "Ein RCD löst bei 30 mA aus. Gib diesen Wert in Ampere an.", answer: 0.03, tolerance: 0.001, explanation: "30 mA entsprechen 0,03 A." },
-      { id: "pp-6", topic: "switching", prompt: "Wie viele Leiter werden in einer Sparwechselschaltung zwischen den Stellen benötigt?", answer: 3, tolerance: 0, explanation: "Genau darin liegt die Materialeinsparung der Sparwechselschaltung." }
+      { id: "pp-6", topic: "switching", prompt: "Wie viele Leiter werden in einer Sparwechselschaltung zwischen den Stellen benötigt?", answer: 3, tolerance: 0, explanation: "Genau darin liegt die Materialeinsparung der Sparwechselschaltung." },
+      { id: "pp-7", topic: "measurement", prompt: "Bestimme den Widerstand bei U = 230 V und I = 5 A. Gib das Ergebnis in Ohm an.", answer: 46, tolerance: 0.3, explanation: "R = U / I = 230 / 5 = 46 Ω." },
+      { id: "pp-8", topic: "safety", prompt: "Leckstrom 18 mA, RCD-Schwelle 30 mA. Gib 1 ein, wenn der RCD auslösen muss, sonst 0.", answer: 0, tolerance: 0, explanation: "18 mA liegt unter 30 mA, daher sollte ein 30-mA-RCD nicht auslösen." }
     ],
     quizData: [
       { id: "qq-1", topic: "safety", q: "Ab welcher Stromstärke ist Kammerflimmern bereits möglich?", opts: ["10 mA", "50 mA", "150 mA", "300 mA"], correct: 1, explanation: "Schon etwa 50 bis 80 mA können Kammerflimmern auslösen." },
@@ -1087,7 +1101,11 @@ export const BASE_CONTENT = {
       { id: "qq-9", topic: "safety", q: "Wozu dient der Schutzleiter PE?", opts: ["Zum Erhöhen der Spannung", "Zum Ableiten des Fehlerstromes", "Zum Messen des Stromes", "Zum Schalten des Lichtes"], correct: 1, explanation: "PE schafft einen sicheren Weg für den Fehlerstrom." },
       { id: "qq-10", topic: "measurement", q: "Welche Leistung ergibt sich bei U = 12 V und I = 2 A?", opts: ["6 W", "12 W", "24 W", "48 W"], correct: 2, explanation: "P = U · I = 12 · 2 = 24 W." },
       { id: "qq-11", topic: "switching", q: "Wie viele Kreuzschalter braucht man für 4 Schaltstellen?", opts: ["1", "2", "3", "4"], correct: 1, explanation: "Für vier Stellen braucht man zwei Wechselschalter und zwei Kreuzschalter." },
-      { id: "qq-12", topic: "safety", q: "Was ist für die Gefährdung einer Person entscheidender?", opts: ["Nur die Spannung", "Vor allem der Strom durch den Körper", "Nur der Widerstand", "Nur die Leistung"], correct: 1, explanation: "Die eigentliche Gefährdung hängt primär vom Strom durch den Körper ab." }
+      { id: "qq-12", topic: "safety", q: "Was ist für die Gefährdung einer Person entscheidender?", opts: ["Nur die Spannung", "Vor allem der Strom durch den Körper", "Nur der Widerstand", "Nur die Leistung"], correct: 1, explanation: "Die eigentliche Gefährdung hängt primär vom Strom durch den Körper ab." },
+      { id: "qq-13", topic: "measurement", q: "Welcher Widerstand ergibt sich bei U = 230 V und I = 5 A?", opts: ["23 Ω", "46 Ω", "115 Ω", "230 Ω"], correct: 1, explanation: "R = U / I = 230 / 5 = 46 Ω." },
+      { id: "qq-14", topic: "switching", q: "Welche Schalter stehen an den Enden einer Kreuzschaltung?", opts: ["Zwei Wechselschalter", "Zwei Kreuzschalter", "Zwei Automaten", "Zwei Dimmer"], correct: 0, explanation: "An den Enden sitzen zwei Wechselschalter, die Kreuzschalter liegen dazwischen." },
+      { id: "qq-15", topic: "safety", q: "Was ist vor Arbeiten am Verteiler zwingend?", opts: ["Freischalten und Spannungsfreiheit prüfen", "Nur Handschuhe tragen", "Nur die Raumbeleuchtung ausschalten", "Leiter kurz mit der Hand testen"], correct: 0, explanation: "Erst freischalten, dann Spannungsfreiheit prüfen und gegen Wiedereinschalten sichern." },
+      { id: "qq-16", topic: "measurement", q: "Wie ändert sich der Strom bei konstantem Widerstand, wenn die Spannung verdoppelt wird?", opts: ["Er verdoppelt sich", "Er halbiert sich", "Er bleibt gleich", "Er vervierfacht sich"], correct: 0, explanation: "Nach I = U / R führt doppelte Spannung bei gleichem R zu doppeltem Strom." }
     ],
     checklistItems: [
       "Ich kenne die Strombereiche und ihre Wirkung auf den Körper.",

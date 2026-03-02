@@ -3,59 +3,34 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
+import {
+  assertVisible,
+  dismissWelcomeModal,
+  waitForActiveSection,
+  waitForWarningToast,
+  waitForServer
+} from "./browser-smoke-helpers.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baseUrl = "http://127.0.0.1:4173";
 
-function assertVisible(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-async function waitForServer() {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    try {
-      const response = await fetch(`${baseUrl}/index.html`);
-      if (response.ok) {
-        return;
-      }
-    } catch (error) {
-      await delay(250);
-    }
-  }
-
-  throw new Error("Development server did not start in time.");
-}
-
-async function dismissWelcomeModal(page) {
-  const closeButton = page.locator("#closeWelcomeBtn");
-  if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click();
-    await page.locator("#welcomeModal").waitFor({ state: "hidden" });
-  }
-}
-
-async function waitForActiveSection(page, sectionId) {
-  await page.waitForFunction((expectedSectionId) => {
-    return document.querySelector(".section.active")?.id === expectedSectionId;
-  }, sectionId);
-}
-
 async function buildBackupFixture() {
-  const fixturePath = path.join(os.tmpdir(), `electro-study-backup-${Date.now()}.json`);
+  const fixturePath = path.join(os.tmpdir(), `electro-study-backup-valid-${Date.now()}.json`);
   const payload = {
     version: 2,
     savedAt: "2026-02-27T18:00:00.000Z",
     language: "uk",
     onboardingSeen: true,
+    examSettings: {
+      durationMinutes: 15,
+      questionCount: 10
+    },
     viewState: {
       activeSection: "flashcards",
-      activeTopic: "switching",
+      activeTopic: "measurement",
       searchQuery: "",
       currentCard: 1,
       diagramSelections: {}
@@ -70,7 +45,7 @@ async function buildBackupFixture() {
       quizMastered: [],
       quizMode: "default",
       quizVariantIds: [],
-      reviewQueue: [],
+      reviewQueue: ["qq-2"],
       stats: {
         quizRuns: 0,
         examRuns: 0,
@@ -92,6 +67,38 @@ async function buildBackupFixture() {
   return fixturePath;
 }
 
+async function buildInvalidBackupFixture() {
+  const fixturePath = path.join(os.tmpdir(), `electro-study-backup-invalid-${Date.now()}.json`);
+  const payload = {
+    language: "uk",
+    progress: {
+      checklist: ["bad-index"]
+    }
+  };
+
+  await fs.promises.writeFile(fixturePath, JSON.stringify(payload, null, 2), "utf8");
+  return fixturePath;
+}
+
+async function buildInvalidCustomPackFixture() {
+  const fixturePath = path.join(os.tmpdir(), `electro-study-pack-invalid-${Date.now()}.json`);
+  const payload = {
+    uk: {
+      flashcards: [
+        {
+          id: "fc-1",
+          topic: "unknown",
+          term: "",
+          def: "broken"
+        }
+      ]
+    }
+  };
+
+  await fs.promises.writeFile(fixturePath, JSON.stringify(payload, null, 2), "utf8");
+  return fixturePath;
+}
+
 const server = spawn(process.execPath, ["scripts/dev-server.mjs"], {
   cwd: rootDir,
   stdio: "ignore"
@@ -99,10 +106,10 @@ const server = spawn(process.execPath, ["scripts/dev-server.mjs"], {
 server.on("error", () => {});
 
 let browser;
-let fixturePath = "";
+const fixturePaths = [];
 
 try {
-  await waitForServer();
+  await waitForServer(baseUrl);
 
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -138,7 +145,7 @@ try {
   await page.waitForFunction(() => document.documentElement.lang === "de");
 
   await page.locator("#searchInput").fill("schutz");
-  await delay(250);
+  await page.waitForTimeout(250);
   await page.locator('[data-topic-filter="safety"]').click();
   await page.locator("#tabQuiz").click();
   await waitForActiveSection(page, "quiz");
@@ -154,6 +161,16 @@ try {
   await waitForActiveSection(page, "exam");
   await page.locator("#examDurationSelect").selectOption("6");
   await page.locator("#examCountSelect").selectOption("6");
+  await page.locator("#tabOverview").click();
+  await waitForActiveSection(page, "overview");
+  await page.locator("#tabExam").click();
+  await waitForActiveSection(page, "exam");
+
+  const persistedDuration = await page.locator("#examDurationSelect").inputValue();
+  const persistedCount = await page.locator("#examCountSelect").inputValue();
+  assertVisible(persistedDuration === "6", "Exam duration setting did not persist in intro state.");
+  assertVisible(persistedCount === "6", "Exam question count setting did not persist in intro state.");
+
   await page.locator('[data-start-exam="true"]').click();
   await page.locator('[data-submit-exam="true"]').waitFor();
   await page.locator('[data-exam-answer]').first().click();
@@ -164,8 +181,25 @@ try {
   const selectedExamAnswers = await page.locator(".exam-question .quiz-option.selected").count();
   assertVisible(selectedExamAnswers >= 1, "Running exam answer was not restored after reload.");
 
-  fixturePath = await buildBackupFixture();
-  await page.locator("#importProgressInput").setInputFiles(fixturePath);
+  const invalidPackPath = await buildInvalidCustomPackFixture();
+  fixturePaths.push(invalidPackPath);
+  const invalidPackToastCount = await page.locator(".toast.warning").count();
+  await page.locator("#importPackInput").setInputFiles(invalidPackPath);
+  await waitForWarningToast(page, invalidPackToastCount);
+  const persistedCustomPack = await page.evaluate(() => window.localStorage.getItem("study.customPack"));
+  assertVisible(!persistedCustomPack, "Invalid custom pack should not be persisted.");
+
+  const invalidBackupPath = await buildInvalidBackupFixture();
+  fixturePaths.push(invalidBackupPath);
+  const invalidBackupToastCount = await page.locator(".toast.warning").count();
+  await page.locator("#importProgressInput").setInputFiles(invalidBackupPath);
+  await waitForWarningToast(page, invalidBackupToastCount);
+  await page.waitForFunction(() => document.documentElement.lang === "de");
+  await waitForActiveSection(page, "exam");
+
+  const validBackupPath = await buildBackupFixture();
+  fixturePaths.push(validBackupPath);
+  await page.locator("#importProgressInput").setInputFiles(validBackupPath);
   await page.waitForFunction(() => document.documentElement.lang === "uk");
   await waitForActiveSection(page, "flashcards");
   await page.waitForFunction(() => {
@@ -174,6 +208,23 @@ try {
 
   const flashcardTerm = await page.locator("#fcTerm").textContent();
   assertVisible(Boolean(flashcardTerm && flashcardTerm.trim().length), "Backup import did not restore flashcard view.");
+
+  await page.locator("#tabExam").click();
+  await waitForActiveSection(page, "exam");
+  const importedDuration = await page.locator("#examDurationSelect").inputValue();
+  const importedCount = await page.locator("#examCountSelect").inputValue();
+  assertVisible(importedDuration === "15", "Backup import did not restore exam duration setting.");
+  assertVisible(importedCount === "10", "Backup import did not restore exam question count setting.");
+  await page.locator("#tabOverview").click();
+  await waitForActiveSection(page, "overview");
+
+  await page.waitForFunction(() => window.location.search.includes("topic=measurement"));
+  await page.locator("#reviewNowBtn").click();
+  await waitForActiveSection(page, "quiz");
+  await page.waitForFunction(() => window.location.search.includes("topic=switching"));
+
+  const reviewQuestionCount = await page.locator(".quiz-card").count();
+  assertVisible(reviewQuestionCount >= 1, "Adaptive review mode did not open a review quiz.");
 
   console.log("Browser smoke test passed.");
 } finally {
@@ -189,7 +240,5 @@ try {
     }
   }
 
-  if (fixturePath) {
-    await fs.promises.rm(fixturePath, { force: true }).catch(() => {});
-  }
+  await Promise.all(fixturePaths.map((fixturePath) => fs.promises.rm(fixturePath, { force: true }).catch(() => {})));
 }

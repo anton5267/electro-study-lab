@@ -1,6 +1,9 @@
 import { buildViewStateSnapshot, normalizeViewStateSnapshot } from "./runtime.js";
 import { createDefaultStats, normalizeStats } from "./storage.js";
+import { buildExamPreferences } from "./exam-preferences.js";
 import { clamp, normalizeCardOrder, normalizeMap, normalizeNumberArray } from "./utils.js";
+
+export const BACKUP_VERSION = 3;
 
 export function readStringArray(value) {
   if (!Array.isArray(value)) {
@@ -10,12 +13,47 @@ export function readStringArray(value) {
   return value.filter((item) => typeof item === "string");
 }
 
+export function migrateBackupPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  const migrated = {
+    ...payload
+  };
+  const legacyProgress = extractLegacyProgress(payload);
+  if (!migrated.progress && legacyProgress) {
+    migrated.progress = legacyProgress;
+  }
+
+  if (!migrated.viewState) {
+    const legacyViewState = extractLegacyViewState(payload);
+    if (legacyViewState) {
+      migrated.viewState = legacyViewState;
+    }
+  }
+
+  if (!migrated.examSettings) {
+    const legacyExamSettings = extractLegacyExamSettings(payload);
+    if (legacyExamSettings) {
+      migrated.examSettings = legacyExamSettings;
+    }
+  }
+
+  migrated.version = BACKUP_VERSION;
+  return migrated;
+}
+
 export function buildBackupPayload(state, serializeExamState, now = new Date()) {
   return {
-    version: 2,
+    version: BACKUP_VERSION,
     savedAt: now.toISOString(),
     language: state.lang,
     onboardingSeen: state.onboardingSeen,
+    examSettings: {
+      durationMinutes: state.examDurationMinutes,
+      questionCount: state.examQuestionCount
+    },
     customPack: state.customPack,
     viewState: buildViewStateSnapshot(state),
     progress: {
@@ -49,8 +87,9 @@ export function createImportedBackupState(payload, contentPack, currentLanguage,
     currentCard: viewState.currentCard,
     diagramSelections: viewState.diagramSelections
   }, content, hydrateExamState);
+  const examSettings = resolveImportedExamSettings(payload.examSettings);
 
-  return {
+  const importedState = {
     customPack: payload.customPack ?? null,
     lang: nextLanguage,
     activeSection: progress.exam.status === "running" ? "exam" : viewState.activeSection,
@@ -73,6 +112,13 @@ export function createImportedBackupState(payload, contentPack, currentLanguage,
     quizLogged: false,
     onboardingSeen: Boolean(payload.onboardingSeen)
   };
+
+  if (examSettings) {
+    importedState.examDurationMinutes = examSettings.durationMinutes;
+    importedState.examQuestionCount = examSettings.questionCount;
+  }
+
+  return importedState;
 }
 
 export function normalizeStudyProgress(source, content, hydrateExamState) {
@@ -123,4 +169,68 @@ function toArray(value) {
   }
 
   return [];
+}
+
+function resolveImportedExamSettings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return buildExamPreferences(value.durationMinutes, value.questionCount);
+}
+
+function extractLegacyProgress(payload) {
+  const keys = [
+    "checklist",
+    "seenCards",
+    "cardOrder",
+    "practiceAnswers",
+    "practiceSolved",
+    "quizAnswers",
+    "quizMastered",
+    "quizMode",
+    "quizVariantIds",
+    "reviewQueue",
+    "stats",
+    "examState"
+  ];
+  const progress = {};
+  let hasAny = false;
+
+  keys.forEach((key) => {
+    if (payload[key] === undefined) {
+      return;
+    }
+    progress[key] = payload[key];
+    hasAny = true;
+  });
+
+  return hasAny ? progress : null;
+}
+
+function extractLegacyViewState(payload) {
+  const keys = ["activeSection", "activeTopic", "searchQuery", "currentCard", "diagramSelections"];
+  const viewState = {};
+  let hasAny = false;
+
+  keys.forEach((key) => {
+    if (payload[key] === undefined) {
+      return;
+    }
+    viewState[key] = payload[key];
+    hasAny = true;
+  });
+
+  return hasAny ? viewState : null;
+}
+
+function extractLegacyExamSettings(payload) {
+  if (payload.examDurationMinutes === undefined && payload.examQuestionCount === undefined) {
+    return null;
+  }
+
+  return {
+    durationMinutes: payload.examDurationMinutes,
+    questionCount: payload.examQuestionCount
+  };
 }
