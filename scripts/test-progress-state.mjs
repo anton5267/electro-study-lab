@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
+  BACKUP_VERSION,
   buildBackupPayload,
   createImportedBackupState,
+  migrateBackupPayload,
   normalizeStudyProgress,
   readStringArray
 } from "../assets/js/modules/progress-state.js";
@@ -93,6 +95,8 @@ function hydrateExamState(value, content) {
   const payload = buildBackupPayload({
     lang: "de",
     onboardingSeen: true,
+    examDurationMinutes: 15,
+    examQuestionCount: 10,
     customPack: { uk: { flashcards: [{ id: "extra" }] } },
     activeSection: "quiz",
     activeTopic: "switching",
@@ -114,10 +118,14 @@ function hydrateExamState(value, content) {
   }, () => ({ status: "running", questionIds: ["qq-1"] }), new Date("2026-02-27T15:00:00.000Z"));
 
   assert.deepEqual(payload, {
-    version: 2,
+    version: BACKUP_VERSION,
     savedAt: "2026-02-27T15:00:00.000Z",
     language: "de",
     onboardingSeen: true,
+    examSettings: {
+      durationMinutes: 15,
+      questionCount: 10
+    },
     customPack: { uk: { flashcards: [{ id: "extra" }] } },
     viewState: {
       activeSection: "quiz",
@@ -205,6 +213,10 @@ function hydrateExamState(value, content) {
   const imported = createImportedBackupState({
     language: "de",
     onboardingSeen: false,
+    examSettings: {
+      durationMinutes: 6,
+      questionCount: 10
+    },
     customPack: { de: { checklistItems: ["Extra"] } },
     viewState: {
       activeSection: "theory",
@@ -251,8 +263,95 @@ function hydrateExamState(value, content) {
   assert.deepEqual(imported.cardOrder, [1, 0, 2]);
   assert.equal(imported.quizLogged, false);
   assert.equal(imported.onboardingSeen, false);
+  assert.equal(imported.examDurationMinutes, 6);
+  assert.equal(imported.examQuestionCount, 10);
   assert.equal(imported.exam.status, "running");
   assert.deepEqual(imported.exam.questionIds, ["qq-2"]);
+}
+
+{
+  const imported = createImportedBackupState({
+    language: "uk",
+    onboardingSeen: true,
+    progress: {
+      checklist: [],
+      seenCards: [],
+      cardOrder: [],
+      practiceAnswers: {},
+      practiceSolved: [],
+      quizAnswers: {},
+      quizMastered: [],
+      quizMode: "default",
+      quizVariantIds: [],
+      reviewQueue: [],
+      stats: {},
+      examState: null
+    }
+  }, contentPack, "uk", SECTION_IDS, hydrateExamState);
+
+  assert.equal("examDurationMinutes" in imported, false);
+  assert.equal("examQuestionCount" in imported, false);
+}
+
+{
+  const migrated = migrateBackupPayload({
+    version: 1,
+    language: "uk",
+    activeSection: "quiz",
+    activeTopic: "switching",
+    searchQuery: "legacy",
+    currentCard: 2,
+    diagramSelections: {
+      "theory-1": 0
+    },
+    checklist: [0],
+    seenCards: [1],
+    cardOrder: [1, 0, 2],
+    practiceAnswers: { "pp-1": "12" },
+    practiceSolved: ["pp-1"],
+    quizAnswers: { "qq-1": 2 },
+    quizMastered: ["qq-1"],
+    quizMode: "review",
+    quizVariantIds: ["qq-1"],
+    reviewQueue: ["qq-2"],
+    stats: {
+      quizRuns: 1
+    },
+    examState: null,
+    examDurationMinutes: 15,
+    examQuestionCount: 10
+  });
+
+  assert.equal(migrated.version, BACKUP_VERSION);
+  assert.deepEqual(migrated.progress, {
+    checklist: [0],
+    seenCards: [1],
+    cardOrder: [1, 0, 2],
+    practiceAnswers: { "pp-1": "12" },
+    practiceSolved: ["pp-1"],
+    quizAnswers: { "qq-1": 2 },
+    quizMastered: ["qq-1"],
+    quizMode: "review",
+    quizVariantIds: ["qq-1"],
+    reviewQueue: ["qq-2"],
+    stats: {
+      quizRuns: 1
+    },
+    examState: null
+  });
+  assert.deepEqual(migrated.viewState, {
+    activeSection: "quiz",
+    activeTopic: "switching",
+    searchQuery: "legacy",
+    currentCard: 2,
+    diagramSelections: {
+      "theory-1": 0
+    }
+  });
+  assert.deepEqual(migrated.examSettings, {
+    durationMinutes: 15,
+    questionCount: 10
+  });
 }
 
 console.log("Progress state tests passed.");

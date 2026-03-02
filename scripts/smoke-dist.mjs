@@ -1,54 +1,23 @@
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import {
+  assert,
+  assertCacheHeader,
+  assertCachingValidators,
+  assertDocumentCspHeader,
+  assertPositiveContentLength,
+  assertSecurityHeaders,
+  requestRawPath,
+  waitForServer
+} from "./http-smoke-helpers.mjs";
+import { getDistSmokeChecks } from "./smoke-checks.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = path.join(rootDir, "dist");
 const baseUrl = "http://127.0.0.1:4174";
-const checks = [
-  { path: "/index.html", type: "text/html" },
-  { path: "/404.html", type: "text/html" },
-  { path: "/manifest.webmanifest", type: "application/manifest+json" },
-  { path: "/service-worker.js", type: "text/javascript" },
-  { path: "/release.json", type: "application/json" },
-  { path: "/assets/css/main.css", type: "text/css" },
-  { path: "/assets/js/app.js", type: "text/javascript" },
-  { path: "/assets/js/modules/content.js", type: "text/javascript" },
-  { path: "/assets/js/modules/assessment-state.js", type: "text/javascript" },
-  { path: "/assets/js/modules/progress-state.js", type: "text/javascript" },
-  { path: "/assets/js/modules/runtime.js", type: "text/javascript" },
-  { path: "/assets/js/modules/study-helpers.js", type: "text/javascript" },
-  { path: "/assets/js/modules/storage.js", type: "text/javascript" },
-  { path: "/assets/js/modules/templates.js", type: "text/javascript" },
-  { path: "/assets/js/modules/validation.js", type: "text/javascript" },
-  { path: "/assets/js/modules/utils.js", type: "text/javascript" },
-  { path: "/assets/data/study-pack-template.json", type: "application/json" },
-  { path: "/assets/icons/icon-192.svg", type: "image/svg+xml" },
-  { path: "/assets/icons/icon-512.svg", type: "image/svg+xml" }
-];
-
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-async function waitForServer() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try {
-      const response = await fetch(`${baseUrl}/index.html`);
-      if (response.ok) {
-        return;
-      }
-    } catch (error) {
-      await delay(250);
-    }
-  }
-
-  throw new Error("Dist server did not start in time.");
-}
+const checks = getDistSmokeChecks();
 
 assert(fs.existsSync(distDir), "dist/ does not exist. Run `npm run package` first.");
 assert(fs.existsSync(path.join(distDir, ".nojekyll")), "dist/.nojekyll is missing.");
@@ -65,7 +34,7 @@ const server = spawn(process.execPath, ["scripts/dev-server.mjs"], {
 server.on("error", () => {});
 
 try {
-  await waitForServer();
+  await waitForServer(baseUrl);
 
   for (const check of checks) {
     const response = await fetch(`${baseUrl}${check.path}`);
@@ -76,7 +45,90 @@ try {
       contentType.includes(check.type),
       `${check.path} returned unexpected content-type: ${contentType}`
     );
+
+    assertSecurityHeaders(response, check.path);
+    assertCacheHeader(response, check.path);
+    assertCachingValidators(response, check.path);
+    assertDocumentCspHeader(response, check.path);
+    assertPositiveContentLength(response, check.path);
   }
+
+  const forbidden = await fetch(`${baseUrl}/.gitignore`);
+  assert(forbidden.status === 403, `/.gitignore returned ${forbidden.status}, expected 403`);
+  assertSecurityHeaders(forbidden, "/.gitignore");
+
+  const traversal = await requestRawPath({
+    host: "127.0.0.1",
+    port: 4174,
+    path: "/%2e%2e/package.json"
+  });
+  assert(traversal.status === 403, `/%2e%2e/package.json returned ${traversal.status}, expected 403`);
+  assertSecurityHeaders(traversal, "/%2e%2e/package.json");
+
+  const malformedEscape = await requestRawPath({
+    host: "127.0.0.1",
+    port: 4174,
+    path: "/%zz/index.html"
+  });
+  assert(malformedEscape.status === 403, `/%zz/index.html returned ${malformedEscape.status}, expected 403`);
+  assertSecurityHeaders(malformedEscape, "/%zz/index.html");
+
+  const nullByteEscape = await requestRawPath({
+    host: "127.0.0.1",
+    port: 4174,
+    path: "/%00/index.html"
+  });
+  assert(nullByteEscape.status === 403, `/%00/index.html returned ${nullByteEscape.status}, expected 403`);
+  assertSecurityHeaders(nullByteEscape, "/%00/index.html");
+
+  const methodNotAllowed = await fetch(`${baseUrl}/index.html`, {
+    method: "POST",
+    body: "ping"
+  });
+  assert(methodNotAllowed.status === 405, `POST /index.html returned ${methodNotAllowed.status}, expected 405`);
+  assert(methodNotAllowed.headers.get("allow") === "GET, HEAD", "POST /index.html missing Allow header.");
+  assert(methodNotAllowed.headers.get("cache-control") === "no-cache", "POST /index.html cache-control must be no-cache.");
+  assertSecurityHeaders(methodNotAllowed, "POST /index.html");
+
+  const notFound = await fetch(`${baseUrl}/missing-resource.txt`);
+  assert(notFound.status === 404, `/missing-resource.txt returned ${notFound.status}, expected 404`);
+  assert(notFound.headers.get("cache-control") === "no-cache", "404 response cache-control must be no-cache.");
+  assertSecurityHeaders(notFound, "/missing-resource.txt");
+
+  const headIndex = await fetch(`${baseUrl}/index.html`, { method: "HEAD" });
+  assert(headIndex.status === 200, `HEAD /index.html returned ${headIndex.status}, expected 200`);
+  assertSecurityHeaders(headIndex, "HEAD /index.html");
+  assertCacheHeader(headIndex, "/index.html");
+  assertCachingValidators(headIndex, "HEAD /index.html");
+  assertDocumentCspHeader(headIndex, "/index.html");
+  assertPositiveContentLength(headIndex, "HEAD /index.html");
+
+  const indexResponse = await fetch(`${baseUrl}/index.html`);
+  const indexTag = indexResponse.headers.get("etag");
+  const indexLastModified = indexResponse.headers.get("last-modified");
+  assert(typeof indexTag === "string" && indexTag.length > 0, "GET /index.html missing ETag header.");
+  assert(typeof indexLastModified === "string" && indexLastModified.length > 0, "GET /index.html missing last-modified header.");
+
+  const notModified = await fetch(`${baseUrl}/index.html`, {
+    headers: {
+      "If-None-Match": indexTag
+    }
+  });
+  assert(notModified.status === 304, `Conditional GET /index.html returned ${notModified.status}, expected 304`);
+  assertSecurityHeaders(notModified, "Conditional GET /index.html");
+  assertCacheHeader(notModified, "/index.html");
+  assert(notModified.headers.get("etag") === indexTag, "Conditional GET /index.html returned mismatched ETag.");
+  assertDocumentCspHeader(notModified, "/index.html");
+
+  const notModifiedByDate = await fetch(`${baseUrl}/index.html`, {
+    headers: {
+      "If-Modified-Since": indexLastModified
+    }
+  });
+  assert(notModifiedByDate.status === 304, `If-Modified-Since GET /index.html returned ${notModifiedByDate.status}, expected 304`);
+  assertSecurityHeaders(notModifiedByDate, "If-Modified-Since GET /index.html");
+  assertCacheHeader(notModifiedByDate, "/index.html");
+  assertDocumentCspHeader(notModifiedByDate, "/index.html");
 
   const html = await fetch(`${baseUrl}/index.html`).then((response) => response.text());
   assert(html.includes('id="connectionStatus"'), "dist/index.html is missing connection status chip.");

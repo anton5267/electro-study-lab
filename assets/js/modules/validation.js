@@ -1,6 +1,8 @@
 import { BASE_CONTENT } from "./content.js";
+import { EXAM_DURATION_OPTIONS, EXAM_QUESTION_COUNT_OPTIONS } from "./exam-preferences.js";
 
 const SECTION_IDS = ["overview", "theory", "flashcards", "practice", "quiz", "exam", "checklist", "analytics"];
+const MAX_CUSTOM_PACK_ITEMS_PER_COLLECTION = 500;
 
 export function validateCustomPack(pack, baseContent) {
   const errors = [];
@@ -51,6 +53,12 @@ export function validateCustomPack(pack, baseContent) {
       if (!Array.isArray(languagePack[collectionName])) {
         errors.push(`${language}.${collectionName} must be an array.`);
         return;
+      }
+
+      if (languagePack[collectionName].length > MAX_CUSTOM_PACK_ITEMS_PER_COLLECTION) {
+        errors.push(
+          `${language}.${collectionName} exceeds max items (${MAX_CUSTOM_PACK_ITEMS_PER_COLLECTION}).`
+        );
       }
     });
 
@@ -118,20 +126,38 @@ export function validateBackupPayload(payload, contentPack) {
     errors.push("onboardingSeen must be a boolean.");
   }
 
+  if (payload.examSettings !== undefined) {
+    validateExamSettings(payload.examSettings, errors);
+  }
+
   if (payload.viewState !== undefined && payload.viewState !== null) {
     validateViewState(payload.viewState, content, errors);
   }
 
   const progress = payload.progress;
-  assertArray(progress.checklist, "progress.checklist", errors);
-  assertArray(progress.seenCards, "progress.seenCards", errors);
-  assertArray(progress.cardOrder, "progress.cardOrder", errors);
+  const progressArrayFields = [
+    "checklist",
+    "seenCards",
+    "cardOrder",
+    "practiceSolved",
+    "quizMastered",
+    "quizVariantIds",
+    "reviewQueue"
+  ];
+  progressArrayFields.forEach((field) => assertArray(progress[field], `progress.${field}`, errors));
+
   assertObject(progress.practiceAnswers, "progress.practiceAnswers", errors);
-  assertArray(progress.practiceSolved, "progress.practiceSolved", errors);
   assertObject(progress.quizAnswers, "progress.quizAnswers", errors);
-  assertArray(progress.quizMastered, "progress.quizMastered", errors);
-  assertArray(progress.quizVariantIds, "progress.quizVariantIds", errors);
-  assertArray(progress.reviewQueue, "progress.reviewQueue", errors);
+
+  ["checklist", "seenCards", "cardOrder"].forEach((field) => {
+    assertNonNegativeIntegerArrayMembers(progress[field], `progress.${field}`, errors);
+  });
+  ["practiceSolved", "quizMastered", "quizVariantIds", "reviewQueue"].forEach((field) => {
+    assertStringArrayMembers(progress[field], `progress.${field}`, errors);
+  });
+
+  assertPracticeAnswers(progress.practiceAnswers, errors);
+  assertQuizAnswers(progress.quizAnswers, errors);
 
   if (
     progress.quizMode !== undefined &&
@@ -394,6 +420,23 @@ function validateViewState(viewState, content, errors) {
   }
 }
 
+function validateExamSettings(examSettings, errors) {
+  if (!examSettings || typeof examSettings !== "object" || Array.isArray(examSettings)) {
+    errors.push("examSettings must be an object.");
+    return;
+  }
+
+  const duration = Number(examSettings.durationMinutes);
+  if (!Number.isFinite(duration) || !EXAM_DURATION_OPTIONS.includes(duration)) {
+    errors.push(`examSettings.durationMinutes must be one of: ${EXAM_DURATION_OPTIONS.join(", ")}.`);
+  }
+
+  const questionCount = Number(examSettings.questionCount);
+  if (!Number.isFinite(questionCount) || !EXAM_QUESTION_COUNT_OPTIONS.includes(questionCount)) {
+    errors.push(`examSettings.questionCount must be one of: ${EXAM_QUESTION_COUNT_OPTIONS.join(", ")}.`);
+  }
+}
+
 function validateDuplicateIds(items, language, collectionName, baseItems, errors) {
   const ids = items.map((item) => item?.id).filter((id) => typeof id === "string");
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
@@ -462,6 +505,63 @@ function assertArray(value, label, errors) {
 function assertObject(value, label, errors) {
   if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) {
     errors.push(`${label} must be an object.`);
+  }
+}
+
+function assertNonNegativeIntegerArrayMembers(value, label, errors) {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  if (value.some((item) => !Number.isInteger(Number(item)) || Number(item) < 0)) {
+    errors.push(`${label} must contain non-negative integers.`);
+  }
+}
+
+function assertStringArrayMembers(value, label, errors) {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  if (value.some((item) => typeof item !== "string" || !item.trim())) {
+    errors.push(`${label} must contain non-empty strings.`);
+  }
+}
+
+function assertPracticeAnswers(value, errors) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return;
+  }
+
+  const hasInvalidEntry = Object.entries(value).some(([id, answer]) => (
+    typeof id !== "string" ||
+    !id ||
+    !(
+      typeof answer === "string" ||
+      (typeof answer === "number" && Number.isFinite(answer))
+    )
+  ));
+
+  if (hasInvalidEntry) {
+    errors.push("progress.practiceAnswers must map ids to string/number values.");
+  }
+}
+
+function assertQuizAnswers(value, errors) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return;
+  }
+
+  const hasInvalidEntry = Object.entries(value).some(([id, answer]) => (
+    typeof id !== "string" ||
+    !id ||
+    !Number.isInteger(Number(answer)) ||
+    Number(answer) < 0 ||
+    Number(answer) > 3
+  ));
+
+  if (hasInvalidEntry) {
+    errors.push("progress.quizAnswers must map ids to answer indexes 0-3.");
   }
 }
 

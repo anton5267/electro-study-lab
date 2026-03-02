@@ -1,0 +1,2 @@
+id,topic,prompt,answer,tolerance,explanation
+ext-pp-101,measurement,Обчисли потужність при U = 230 V і I = 0.5 A у ватах.,115,0.5,P = U * I = 230 * 0.5 = 115 W.

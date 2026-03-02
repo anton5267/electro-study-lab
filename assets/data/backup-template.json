@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "savedAt": "2026-01-01T00:00:00.000Z",
+  "language": "uk",
+  "onboardingSeen": false,
+  "progress": {
+    "checklist": [],
+    "seenCards": [],
+    "cardOrder": [],
+    "practiceAnswers": {},
+    "practiceSolved": [],
+    "quizAnswers": {},
+    "quizMastered": [],
+    "quizMode": "default",
+    "quizVariantIds": [],
+    "reviewQueue": [],
+    "stats": {}
+  }
+}

@@ -1,50 +1,22 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
+import {
+  assertVisible,
+  dismissWelcomeModal,
+  waitForActiveSection,
+  waitForWarningToast,
+  waitForServer
+} from "./browser-smoke-helpers.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = path.join(rootDir, "dist");
 const baseUrl = "http://127.0.0.1:4175";
-
-function assertVisible(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-async function waitForServer() {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    try {
-      const response = await fetch(`${baseUrl}/index.html`);
-      if (response.ok) {
-        return;
-      }
-    } catch (error) {
-      await delay(250);
-    }
-  }
-
-  throw new Error("Dist browser server did not start in time.");
-}
-
-async function dismissWelcomeModal(page) {
-  const closeButton = page.locator("#closeWelcomeBtn");
-  if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click();
-    await page.locator("#welcomeModal").waitFor({ state: "hidden" });
-  }
-}
-
-async function waitForActiveSection(page, sectionId) {
-  await page.waitForFunction((expectedSectionId) => {
-    return document.querySelector(".section.active")?.id === expectedSectionId;
-  }, sectionId);
-}
 
 assert(fs.existsSync(distDir), "dist/ does not exist. Run `npm run package` first.");
 
@@ -60,9 +32,10 @@ const server = spawn(process.execPath, ["scripts/dev-server.mjs"], {
 server.on("error", () => {});
 
 let browser;
+const fixturePaths = [];
 
 try {
-  await waitForServer();
+  await waitForServer(baseUrl);
 
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
@@ -104,8 +77,46 @@ try {
   assertVisible(copiedUrl.includes("lang=de"), "Dist share link is missing language state.");
   assertVisible(copiedUrl.endsWith("#quiz"), "Dist share link is missing active section.");
 
+  await page.evaluate(() => {
+    window.localStorage.setItem("study.reviewQueue", JSON.stringify(["qq-2"]));
+    window.localStorage.setItem("study.quizMode", JSON.stringify("default"));
+    window.localStorage.setItem("study.quizAnswers", JSON.stringify({}));
+    window.localStorage.setItem("study.quizVariantIds", JSON.stringify([]));
+    window.localStorage.setItem("study.viewState", JSON.stringify({
+      activeSection: "overview",
+      activeTopic: "measurement",
+      searchQuery: "",
+      currentCard: 0,
+      diagramSelections: {}
+    }));
+  });
+
+  await page.goto(`${baseUrl}/index.html?lang=de`, { waitUntil: "networkidle" });
+  await dismissWelcomeModal(page);
+  await waitForActiveSection(page, "overview");
+  await page.waitForFunction(() => window.location.search.includes("topic=measurement"));
+
+  await page.locator("#reviewNowBtn").click();
+  await waitForActiveSection(page, "quiz");
+  await page.waitForFunction(() => window.location.search.includes("topic=switching"));
+
+  const adaptiveReviewCount = await page.locator(".quiz-card").count();
+  assertVisible(adaptiveReviewCount >= 1, "Dist adaptive review did not open review questions.");
+
   await page.locator("#tabExam").click();
   await waitForActiveSection(page, "exam");
+  await page.locator("#examDurationSelect").selectOption("15");
+  await page.locator("#examCountSelect").selectOption("10");
+  await page.locator("#tabOverview").click();
+  await waitForActiveSection(page, "overview");
+  await page.locator("#tabExam").click();
+  await waitForActiveSection(page, "exam");
+
+  const persistedDuration = await page.locator("#examDurationSelect").inputValue();
+  const persistedCount = await page.locator("#examCountSelect").inputValue();
+  assertVisible(persistedDuration === "15", "Dist exam duration setting did not persist in intro state.");
+  assertVisible(persistedCount === "10", "Dist exam question count setting did not persist in intro state.");
+
   await page.locator('[data-start-exam="true"]').click();
   await page.locator('[data-submit-exam="true"]').waitFor();
   await page.locator('[data-exam-answer]').first().click();
@@ -114,6 +125,35 @@ try {
 
   const selectedExamAnswers = await page.locator(".exam-question .quiz-option.selected").count();
   assertVisible(selectedExamAnswers >= 1, "Dist exam state was not restored after reload.");
+
+  const invalidPackPath = await writeFixtureFile("dist-pack-invalid", {
+    uk: {
+      flashcards: [
+        {
+          id: "fc-1",
+          topic: "unknown",
+          term: "",
+          def: "broken"
+        }
+      ]
+    }
+  });
+  fixturePaths.push(invalidPackPath);
+  const invalidPackToastCount = await page.locator(".toast.warning").count();
+  await page.locator("#importPackInput").setInputFiles(invalidPackPath);
+  await waitForWarningToast(page, invalidPackToastCount);
+
+  const invalidBackupPath = await writeFixtureFile("dist-backup-invalid", {
+    language: "uk",
+    progress: {
+      checklist: ["bad-index"]
+    }
+  });
+  fixturePaths.push(invalidBackupPath);
+  const invalidBackupToastCount = await page.locator(".toast.warning").count();
+  await page.locator("#importProgressInput").setInputFiles(invalidBackupPath);
+  await waitForWarningToast(page, invalidBackupToastCount);
+  await page.waitForFunction(() => document.documentElement.lang === "de");
 
   console.log("Dist browser smoke test passed.");
 } finally {
@@ -128,4 +168,12 @@ try {
       // Ignore teardown race conditions on Windows.
     }
   }
+
+  await Promise.all(fixturePaths.map((fixturePath) => fs.promises.rm(fixturePath, { force: true }).catch(() => {})));
+}
+
+async function writeFixtureFile(label, payload) {
+  const fixturePath = path.join(os.tmpdir(), `${label}-${Date.now()}.json`);
+  await fs.promises.writeFile(fixturePath, JSON.stringify(payload, null, 2), "utf8");
+  return fixturePath;
 }

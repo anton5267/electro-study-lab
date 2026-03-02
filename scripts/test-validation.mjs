@@ -74,6 +74,23 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
 }
 
 {
+  const oversizedPack = {
+    uk: {
+      flashcards: Array.from({ length: 501 }, (_, index) => ({
+        id: `custom-fc-limit-${index + 1}`,
+        topic: "measurement",
+        term: `Термін ${index + 1}`,
+        def: `Опис ${index + 1}`
+      }))
+    }
+  };
+
+  const result = validateCustomPack(oversizedPack, BASE_CONTENT);
+  assert.equal(result.valid, false);
+  assert(result.errors.some((message) => message.includes("exceeds max items")));
+}
+
+{
   const customPack = {
     uk: {
       theory: [
@@ -108,6 +125,10 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
     savedAt: "2026-02-27T12:00:00.000Z",
     language: "uk",
     onboardingSeen: true,
+    examSettings: {
+      durationMinutes: 10,
+      questionCount: 8
+    },
     customPack,
     viewState: {
       activeSection: "theory",
@@ -157,6 +178,10 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
     savedAt: "not-a-date",
     language: "uk",
     activeTopic: "bad-topic",
+    examSettings: {
+      durationMinutes: 99,
+      questionCount: "bad"
+    },
     viewState: {
       activeSection: "missing",
       currentCard: -1,
@@ -196,9 +221,41 @@ import { validateBackupPayload, validateCustomPack } from "../assets/js/modules/
   assert(result.errors.some((message) => message.includes("viewState.activeSection")));
   assert(result.errors.some((message) => message.includes("viewState.currentCard")));
   assert(result.errors.some((message) => message.includes("viewState.diagramSelections")));
+  assert(result.errors.some((message) => message.includes("examSettings.durationMinutes")));
+  assert(result.errors.some((message) => message.includes("examSettings.questionCount")));
   assert(result.errors.some((message) => message.includes('quizMode')));
   assert(result.errors.some((message) => message.includes("score must be a number")));
   assert(result.errors.some((message) => message.includes("wrongQuestionIds")));
+}
+
+{
+  const contentPack = buildContentPack(null);
+  const invalidProgressTypes = {
+    language: "uk",
+    progress: {
+      checklist: [0, "bad-index"],
+      seenCards: [{}],
+      cardOrder: [0, -1],
+      practiceAnswers: { "pp-1": null },
+      practiceSolved: [123],
+      quizAnswers: { "qq-1": 9 },
+      quizMastered: [false],
+      quizVariantIds: [null],
+      reviewQueue: [{}]
+    }
+  };
+
+  const result = validateBackupPayload(invalidProgressTypes, contentPack);
+  assert.equal(result.valid, false);
+  assert(result.errors.some((message) => message.includes("progress.checklist must contain non-negative integers")));
+  assert(result.errors.some((message) => message.includes("progress.seenCards must contain non-negative integers")));
+  assert(result.errors.some((message) => message.includes("progress.cardOrder must contain non-negative integers")));
+  assert(result.errors.some((message) => message.includes("progress.practiceAnswers must map ids to string/number values")));
+  assert(result.errors.some((message) => message.includes("progress.practiceSolved must contain non-empty strings")));
+  assert(result.errors.some((message) => message.includes("progress.quizAnswers must map ids to answer indexes 0-3")));
+  assert(result.errors.some((message) => message.includes("progress.quizMastered must contain non-empty strings")));
+  assert(result.errors.some((message) => message.includes("progress.quizVariantIds must contain non-empty strings")));
+  assert(result.errors.some((message) => message.includes("progress.reviewQueue must contain non-empty strings")));
 }
 
 {

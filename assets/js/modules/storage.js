@@ -1,4 +1,6 @@
+const SCHEMA_V = 1;
 const STORAGE_KEYS = {
+  schemaVersion: "study.schemaVersion",
   language: "study.language",
   checklist: "study.checklist",
   seenCards: "study.seenCards",
@@ -14,13 +16,13 @@ const STORAGE_KEYS = {
   customPack: "study.customPack",
   onboardingSeen: "study.onboardingSeen",
   examState: "study.examState",
+  examDurationMinutes: "study.examDurationMinutes",
+  examQuestionCount: "study.examQuestionCount",
   viewState: "study.viewState"
 };
-
 export function getStorageKey(key) {
   return STORAGE_KEYS[key];
 }
-
 export function loadJson(key, fallbackValue) {
   try {
     const raw = window.localStorage.getItem(key);
@@ -29,7 +31,6 @@ export function loadJson(key, fallbackValue) {
     return fallbackValue;
   }
 }
-
 export function saveJson(key, value) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
@@ -37,7 +38,6 @@ export function saveJson(key, value) {
     return;
   }
 }
-
 export function removeStorageKey(key) {
   try {
     window.localStorage.removeItem(key);
@@ -45,17 +45,21 @@ export function removeStorageKey(key) {
     return;
   }
 }
-
+export function migrateStorageSchema() {
+  const storedVersion = Number(loadJson(getStorageKey("schemaVersion"), 0)) || 0;
+  if (storedVersion >= SCHEMA_V) {
+    return;
+  }
+  saveJson(getStorageKey("schemaVersion"), SCHEMA_V);
+}
 export function appendHistoryEntry(stats, entry) {
   const history = Array.isArray(stats.history) ? [...stats.history] : [];
   history.unshift(entry);
-
   return {
     ...stats,
     history: history.slice(0, 12)
   };
 }
-
 export function createDefaultStats() {
   return {
     quizRuns: 0,
@@ -71,14 +75,11 @@ export function createDefaultStats() {
     history: []
   };
 }
-
 export function normalizeStats(value) {
   const fallback = createDefaultStats();
-
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
-
   return {
     quizRuns: Number(value.quizRuns) || 0,
     examRuns: Number(value.examRuns) || 0,
@@ -93,3 +94,4 @@ export function normalizeStats(value) {
     history: Array.isArray(value.history) ? value.history.slice(0, 12) : []
   };
 }
+

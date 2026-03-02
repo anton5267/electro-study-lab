@@ -282,7 +282,10 @@ export function renderQuizSummary(content, score, total, percentage, wrongQuesti
   `;
 }
 
-export function renderExamIntro(content) {
+export function renderExamIntro(content, selectedDurationMinutes = 10, selectedQuestionCount = 8) {
+  const durationOptions = [6, 10, 15];
+  const countOptions = [6, 8, 10];
+
   return `
     <div class="exam-head">
       <div>
@@ -294,17 +297,17 @@ export function renderExamIntro(content) {
       <label class="exam-setting">
         <span>${content.exam.durationLabel}</span>
         <select id="examDurationSelect">
-          <option value="6">6 min</option>
-          <option value="10" selected>10 min</option>
-          <option value="15">15 min</option>
+          ${durationOptions.map((minutes) => (
+            `<option value="${minutes}" ${minutes === selectedDurationMinutes ? "selected" : ""}>${minutes} min</option>`
+          )).join("")}
         </select>
       </label>
       <label class="exam-setting">
         <span>${content.exam.questionCountLabel}</span>
         <select id="examCountSelect">
-          <option value="6">6</option>
-          <option value="8" selected>8</option>
-          <option value="10">10</option>
+          ${countOptions.map((count) => (
+            `<option value="${count}" ${count === selectedQuestionCount ? "selected" : ""}>${count}</option>`
+          )).join("")}
         </select>
       </label>
     </div>

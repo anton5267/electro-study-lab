@@ -1,8 +1,9 @@
 import { BASE_CONTENT, buildContentPack, sanitizeCustomPack } from "./modules/content.js";
 import {
   createDefaultStats,
-  getStorageKey,
+  getStorageKey as keyFor,
   loadJson,
+  migrateStorageSchema,
   normalizeStats,
   removeStorageKey,
   saveJson
@@ -10,17 +11,87 @@ import {
 import {
   answerExamQuestion,
   answerQuestion,
-  buildFinishedExamState,
   buildRecordedStats,
   createDefaultQuizState,
   createEmptyExamState,
   createQuizVariantState,
   createReviewQuizState,
   createRunningExamState,
-  findNextUnansweredQuestion,
-  getExamQuestions as getExamQuestionsHelper,
-  resolveAssessmentResults
+  getExamQuestions as getExamQuestionsHelper
 } from "./modules/assessment-state.js";
+import {
+  createCompletedChecklist,
+  createEmptyChecklist,
+  resolveChecklistToggle
+} from "./modules/checklist-state.js";
+import {
+  CHECKLIST_ACTIONS,
+  resolveChecklistClickAction
+} from "./modules/checklist-control.js";
+import {
+  EXAM_RUNTIME_ACTIONS,
+  resolveExamKeyboardAction,
+  buildResetExamState,
+  resolveExamRuntimeAction,
+  resolveExamRestorePlan,
+  resolveExamSubmitPlan,
+  shouldResetExamFromTarget
+} from "./modules/exam-control.js";
+import {
+  EXAM_INTRO_ACTIONS,
+  resolveExamIntroClickAction,
+  resolveExamIntroChangeAction
+} from "./modules/exam-intro-control.js";
+import {
+  createShuffledCardOrder,
+  getNextCardIndex,
+  getPreviousCardIndex,
+  resolveSeenCardsOnFlip
+} from "./modules/flashcard-state.js";
+import {
+  PRACTICE_ACTIONS,
+  resolvePracticeClickAction,
+  resolvePracticeInputAction,
+  resolvePracticeKeydownAction
+} from "./modules/practice-control.js";
+import {
+  QUIZ_ACTIONS,
+  resolveQuizClickAction,
+  resolveQuizKeyboardAction
+} from "./modules/quiz-control.js";
+import {
+  JUMP_ACTIONS,
+  resolveJumpAction
+} from "./modules/jump-control.js";
+import {
+  NAV_ACTIONS,
+  resolveNavClickAction,
+  resolveNavKeydownAction
+} from "./modules/nav-control.js";
+import {
+  TOPIC_ACTIONS,
+  resolveTopicFilterAction
+} from "./modules/topic-control.js";
+import {
+  LANGUAGE_ACTIONS,
+  resolveLanguageClickAction
+} from "./modules/language-control.js";
+import {
+  KEYBOARD_ACTIONS,
+  resolveMainShortcutAction,
+  resolveModalShortcutAction
+} from "./modules/keyboard-control.js";
+import {
+  THEORY_ACTIONS,
+  applyDiagramSelection,
+  resolveTheoryClickAction
+} from "./modules/theory-control.js";
+import {
+  evaluatePracticeAnswer,
+  resolvePracticeAttempt
+} from "./modules/practice-state.js";
+import { buildFinalizedExamSession } from "./modules/exam-session.js";
+import { buildFinalizedQuizSession } from "./modules/quiz-session.js";
 import {
   formatHistoryLabel as formatHistoryLabelHelper,
   getAchievementProgress as getAchievementProgressHelper,
@@ -30,7 +101,6 @@ import {
   getNextRecommendedStep as getNextRecommendedStepHelper,
   getQuizModeMessage as getQuizModeMessageHelper,
   getQuizScore as getQuizScoreHelper,
-  getQuizSessionLabel as getQuizSessionLabelHelper,
   getReviewItems as getReviewItemsHelper,
   getSearchResults as getSearchResultsHelper,
   getTopicMastery as getTopicMasteryHelper,
@@ -41,11 +111,35 @@ import {
   matchesActiveTopic as matchesActiveTopicHelper
 } from "./modules/study-helpers.js";
 import {
+  resolveAdaptiveReviewCandidate,
+  resolveAdaptiveReviewTopic as resolveAdaptiveReviewTopicHelper
+} from "./modules/review-planner.js";
+import {
   buildBackupPayload,
   createImportedBackupState,
+  migrateBackupPayload,
   normalizeStudyProgress,
   readStringArray
 } from "./modules/progress-state.js";
+import {
+  EXAM_TICK_ACTIONS,
+  buildStartedExamState,
+  resolveExamTickAction
+} from "./modules/exam-runtime.js";
+import {
+  buildExamPreferences,
+  DEFAULT_EXAM_DURATION_MINUTES,
+  DEFAULT_EXAM_QUESTION_COUNT,
+  resolveExamSettings
+} from "./modules/exam-preferences.js";
+import { buildProgressMetrics } from "./modules/progress-metrics.js";
+import {
+  dedupeViewIds,
+  getAppBootViewPlan,
+  getProgressDependentViewPlan,
+  getSearchDependentViewPlan,
+  getTopicDependentViewPlan
+} from "./modules/view-plan.js";
 import {
   buildViewStateSnapshot,
   buildStateUrl,
@@ -78,7 +172,6 @@ import {
   renderWelcomeSteps as renderWelcomeStepsTemplate
 } from "./modules/templates.js";
 import {
-  average,
   clamp,
   createSequence,
   debounce,
@@ -88,10 +181,8 @@ import {
   normalizeCardOrder,
   normalizeMap,
   normalizeNumberArray,
-  safeNumber,
   shuffleArray,
-  toPercent,
-  withinTolerance
+  toPercent
 } from "./modules/utils.js";
 
 const SECTION_IDS = ["overview", "theory", "flashcards", "practice", "quiz", "exam", "checklist", "analytics"];
@@ -237,6 +328,7 @@ const dom = {
   closeWelcomeBtn: document.getElementById("closeWelcomeBtn")
 };
 
+migrateStorageSchema();
 const state = createInitialState();
 
 bindEvents();
@@ -245,14 +337,18 @@ restoreRuntimeState({ notify: true });
 renderApp();
 
 function createInitialState() {
-  const customPack = sanitizeCustomPack(loadJson(getStorageKey("customPack"), null));
+  const customPack = sanitizeCustomPack(loadJson(keyFor("customPack"), null));
   const contentPack = buildContentPack(customPack);
-  const storedLanguage = loadJson(getStorageKey("language"), "uk");
-  const storedViewState = loadJson(getStorageKey("viewState"), {});
+  const storedLanguage = loadJson(keyFor("language"), "uk");
+  const storedViewState = loadJson(keyFor("viewState"), {});
   const initialViewState = resolveInitialViewState(window.location.href, storedViewState, contentPack, storedLanguage, SECTION_IDS);
   const lang = initialViewState.lang;
   const current = contentPack[lang];
-  const exam = hydrateExamState(loadJson(getStorageKey("examState"), null), current);
+  const exam = hydrateExamState(loadJson(keyFor("examState"), null), current);
+  const examPreferences = buildExamPreferences(
+    loadJson(keyFor("examDurationMinutes"), DEFAULT_EXAM_DURATION_MINUTES),
+    loadJson(keyFor("examQuestionCount"), DEFAULT_EXAM_QUESTION_COUNT)
+  );
 
   return {
     lang,
@@ -263,21 +359,23 @@ function createInitialState() {
     activeTopic: initialViewState.activeTopic,
     currentCard: initialViewState.currentCard,
     diagramSelections: initialViewState.diagramSelections,
-    checked: new Set(normalizeNumberArray(loadJson(getStorageKey("checklist"), []), current.checklistItems.length)),
-    seenCards: new Set(normalizeNumberArray(loadJson(getStorageKey("seenCards"), []), current.flashcards.length)),
-    cardOrder: normalizeCardOrder(loadJson(getStorageKey("cardOrder"), []), current.flashcards.length),
-    practiceAnswers: normalizeMap(loadJson(getStorageKey("practiceAnswers"), {})),
-    practiceSolved: new Set(readStringArray(loadJson(getStorageKey("practiceSolved"), []))),
-    quizAnswers: normalizeMap(loadJson(getStorageKey("quizAnswers"), {})),
-    quizMastered: new Set(readStringArray(loadJson(getStorageKey("quizMastered"), []))),
-    quizMode: loadJson(getStorageKey("quizMode"), "default"),
-    quizVariantIds: readStringArray(loadJson(getStorageKey("quizVariantIds"), [])),
+    checked: new Set(normalizeNumberArray(loadJson(keyFor("checklist"), []), current.checklistItems.length)),
+    seenCards: new Set(normalizeNumberArray(loadJson(keyFor("seenCards"), []), current.flashcards.length)),
+    cardOrder: normalizeCardOrder(loadJson(keyFor("cardOrder"), []), current.flashcards.length),
+    practiceAnswers: normalizeMap(loadJson(keyFor("practiceAnswers"), {})),
+    practiceSolved: new Set(readStringArray(loadJson(keyFor("practiceSolved"), []))),
+    quizAnswers: normalizeMap(loadJson(keyFor("quizAnswers"), {})),
+    quizMastered: new Set(readStringArray(loadJson(keyFor("quizMastered"), []))),
+    quizMode: loadJson(keyFor("quizMode"), "default"),
+    quizVariantIds: readStringArray(loadJson(keyFor("quizVariantIds"), [])),
     quizLogged: false,
-    reviewQueue: new Set(readStringArray(loadJson(getStorageKey("reviewQueue"), []))),
-    stats: normalizeStats(loadJson(getStorageKey("stats"), createDefaultStats())),
+    reviewQueue: new Set(readStringArray(loadJson(keyFor("reviewQueue"), []))),
+    stats: normalizeStats(loadJson(keyFor("stats"), createDefaultStats())),
+    examDurationMinutes: examPreferences.durationMinutes,
+    examQuestionCount: examPreferences.questionCount,
     exam,
     pwaPrompt: null,
-    onboardingSeen: Boolean(loadJson(getStorageKey("onboardingSeen"), false)),
+    onboardingSeen: Boolean(loadJson(keyFor("onboardingSeen"), false)),
     isOnline: navigator.onLine,
     updateReady: false,
     serviceWorkerRegistration: null,
@@ -286,15 +384,10 @@ function createInitialState() {
 }
 
 function bindEvents() {
-  dom.languageSwitcher.addEventListener("click", (event) => {
-    const button = event.target.closest(".lang-btn");
-    if (button) {
-      setLanguage(button.dataset.lang);
-    }
-  });
+  dom.languageSwitcher.addEventListener("click", handleLanguageSwitcherClick);
 
   dom.navTabs.forEach((tab) => {
-    tab.addEventListener("click", () => showSection(tab.dataset.section));
+    tab.addEventListener("click", handleNavTabClick);
     tab.addEventListener("keydown", handleNavTabKeydown);
   });
 
@@ -333,6 +426,7 @@ function bindEvents() {
   dom.resetQuizBtn.addEventListener("click", resetQuiz);
 
   dom.examIntro.addEventListener("click", handleExamIntroClick);
+  dom.examIntro.addEventListener("change", handleExamIntroChange);
   dom.examRuntime.addEventListener("click", handleExamRuntimeClick);
   dom.examResult.addEventListener("click", handleExamResultClick);
 
@@ -358,10 +452,8 @@ function bindEvents() {
 }
 
 function renderApp() {
-  renderViews(
-    ["static", "overview", "theory", "flashcards", "practice", "quiz", "exam", "checklist", "analytics", "progress"],
-    { resetFlashcards: true }
-  );
+  const viewPlan = getAppBootViewPlan();
+  renderViews(viewPlan.viewIds, { resetFlashcards: viewPlan.resetFlashcards });
   showSection(state.activeSection, false);
   refreshUrlAndViewState();
   maybeShowOnboarding();
@@ -665,7 +757,7 @@ function renderExam() {
   const content = getContent();
 
   if (state.exam.status === "idle") {
-    dom.examIntro.innerHTML = renderExamIntro(content);
+    dom.examIntro.innerHTML = renderExamIntro(content, state.examDurationMinutes, state.examQuestionCount);
     dom.examRuntime.innerHTML = "";
     dom.examResult.innerHTML = "";
     return;
@@ -683,8 +775,8 @@ function renderExam() {
   dom.examResult.innerHTML = renderExamResult(content);
 }
 
-function renderExamIntro(content) {
-  return renderExamIntroTemplate(content);
+function renderExamIntro(content, durationMinutes, questionCount) {
+  return renderExamIntroTemplate(content, durationMinutes, questionCount);
 }
 
 function renderExamRuntime(content) {
@@ -760,25 +852,29 @@ function renderHistoryItem(item, content) {
 
 function updateProgress() {
   const content = getContent();
-  const total = content.checklistItems.length + content.flashcards.length + content.practiceProblems.length + content.quizData.length + 1;
-  const lastExamPercent = getLastExamPercent();
-  const done = state.checked.size + state.seenCards.size + state.practiceSolved.size + state.quizMastered.size + (lastExamPercent > 0 ? 1 : 0);
-  const completion = toPercent(done, total);
-  const accuracyValues = [state.stats.averageQuizScore, state.stats.averageExamScore].filter((value) => value > 0);
+  const metrics = buildProgressMetrics(content, {
+    checked: state.checked,
+    seenCards: state.seenCards,
+    practiceSolved: state.practiceSolved,
+    quizMastered: state.quizMastered,
+    averageQuizScore: state.stats.averageQuizScore,
+    averageExamScore: state.stats.averageExamScore,
+    lastExamPercent: getLastExamPercent()
+  });
 
-  dom.progressLabel.textContent = format(content.progressTemplate, { done, total });
-  dom.completionValue.textContent = format(content.completionTemplate, { pct: completion });
-  dom.progressBar.style.width = `${completion}%`;
-  dom.metricChecklistValue.textContent = `${state.checked.size}/${content.checklistItems.length}`;
-  dom.metricFlashcardsValue.textContent = `${state.seenCards.size}/${content.flashcards.length}`;
-  dom.metricPracticeValue.textContent = `${state.practiceSolved.size}/${content.practiceProblems.length}`;
-  dom.metricQuizValue.textContent = `${state.quizMastered.size}/${content.quizData.length}`;
-  dom.metricExamValue.textContent = lastExamPercent > 0 ? `${Math.round(lastExamPercent)}%` : "—";
-  dom.metricAccuracyValue.textContent = accuracyValues.length ? `${Math.round(average(accuracyValues))}%` : "—";
+  dom.progressLabel.textContent = format(content.progressTemplate, { done: metrics.done, total: metrics.total });
+  dom.completionValue.textContent = format(content.completionTemplate, { pct: metrics.completion });
+  dom.progressBar.style.width = `${metrics.completion}%`;
+  dom.metricChecklistValue.textContent = `${metrics.checklist.done}/${metrics.checklist.total}`;
+  dom.metricFlashcardsValue.textContent = `${metrics.flashcards.done}/${metrics.flashcards.total}`;
+  dom.metricPracticeValue.textContent = `${metrics.practice.done}/${metrics.practice.total}`;
+  dom.metricQuizValue.textContent = `${metrics.quiz.done}/${metrics.quiz.total}`;
+  dom.metricExamValue.textContent = metrics.lastExamPercent > 0 ? `${Math.round(metrics.lastExamPercent)}%` : "—";
+  dom.metricAccuracyValue.textContent = metrics.accuracyPercent !== null ? `${metrics.accuracyPercent}%` : "—";
 }
 
 function renderViews(viewIds, { resetFlashcards = false } = {}) {
-  [...new Set(viewIds)].forEach((viewId) => {
+  dedupeViewIds(viewIds).forEach((viewId) => {
     switch (viewId) {
       case "static":
         renderStaticText();
@@ -825,19 +921,20 @@ function refreshUrlAndViewState() {
 }
 
 function rerenderSearchDependentViews() {
-  renderViews(["overview", "theory", "flashcards", "practice", "checklist"], { resetFlashcards: true });
+  const viewPlan = getSearchDependentViewPlan();
+  renderViews(viewPlan.viewIds, { resetFlashcards: viewPlan.resetFlashcards });
   refreshUrlAndViewState();
 }
 
 function rerenderTopicDependentViews() {
-  renderViews(["topicFilters", "overview", "theory", "flashcards", "practice", "quiz", "checklist", "analytics"], {
-    resetFlashcards: true
-  });
+  const viewPlan = getTopicDependentViewPlan();
+  renderViews(viewPlan.viewIds, { resetFlashcards: viewPlan.resetFlashcards });
   refreshUrlAndViewState();
 }
 
 function rerenderProgressDependentViews({ includeAnalytics = true } = {}) {
-  renderViews(includeAnalytics ? ["progress", "overview", "analytics"] : ["progress", "overview"]);
+  const viewPlan = getProgressDependentViewPlan(includeAnalytics);
+  renderViews(viewPlan.viewIds, { resetFlashcards: viewPlan.resetFlashcards });
 }
 
 function showSection(sectionId, updateHash = true) {
@@ -874,7 +971,7 @@ function setLanguage(language) {
 
   state.lang = language;
   normalizeStateAfterContentChange();
-  saveJson(getStorageKey("language"), state.lang);
+  saveJson(keyFor("language"), state.lang);
   renderApp();
 }
 
@@ -884,41 +981,39 @@ function handleSearchInput(event) {
   rerenderSearchDependentViews();
 }
 
-function handleNavTabKeydown(event) {
-  const currentIndex = dom.navTabs.indexOf(event.currentTarget);
-  if (currentIndex === -1) {
+function handleNavTabClick(event) {
+  const action = resolveNavClickAction(event.currentTarget?.dataset?.section, SECTION_IDS);
+  if (action.type !== NAV_ACTIONS.SELECT_SECTION) {
     return;
   }
 
-  let nextIndex = null;
+  showSection(action.sectionId);
+}
 
-  if (event.key === "ArrowRight") {
-    nextIndex = (currentIndex + 1) % dom.navTabs.length;
-  } else if (event.key === "ArrowLeft") {
-    nextIndex = (currentIndex - 1 + dom.navTabs.length) % dom.navTabs.length;
-  } else if (event.key === "Home") {
-    nextIndex = 0;
-  } else if (event.key === "End") {
-    nextIndex = dom.navTabs.length - 1;
-  }
-
-  if (nextIndex === null) {
+function handleNavTabKeydown(event) {
+  const currentIndex = dom.navTabs.indexOf(event.currentTarget);
+  const tabSections = dom.navTabs.map((tab) => tab.dataset.section);
+  const action = resolveNavKeydownAction(event.key, currentIndex, tabSections, SECTION_IDS);
+  if (action.type !== NAV_ACTIONS.MOVE_TO_TAB) {
     return;
   }
 
   event.preventDefault();
-  const nextTab = dom.navTabs[nextIndex];
-  showSection(nextTab.dataset.section);
+  const nextTab = dom.navTabs[action.nextIndex];
+  showSection(action.sectionId);
   nextTab.focus();
 }
 
 function handleTopicFilterClick(event) {
-  const button = event.target.closest("[data-topic-filter]");
-  if (!button) {
+  const action = resolveTopicFilterAction(
+    event.target,
+    ["all", ...Object.keys(getContent().topicLabels)]
+  );
+  if (action.type !== TOPIC_ACTIONS.SELECT_TOPIC) {
     return;
   }
 
-  state.activeTopic = button.dataset.topicFilter;
+  state.activeTopic = action.topic;
   state.currentCard = 0;
   rerenderTopicDependentViews();
 }
@@ -929,13 +1024,26 @@ function clearSearch() {
   rerenderSearchDependentViews();
 }
 
-function handleTheoryClick(event) {
-  const button = event.target.closest("[data-hotspot-index]");
-  if (!button) {
+function handleLanguageSwitcherClick(event) {
+  const action = resolveLanguageClickAction(event.target, Object.keys(state.contentPack));
+  if (action.type !== LANGUAGE_ACTIONS.SET_LANGUAGE) {
     return;
   }
 
-  state.diagramSelections[button.dataset.cardId] = Number(button.dataset.hotspotIndex);
+  setLanguage(action.language);
+}
+
+function handleTheoryClick(event) {
+  const action = resolveTheoryClickAction(event.target);
+  if (action.type !== THEORY_ACTIONS.SELECT_HOTSPOT) {
+    return;
+  }
+
+  state.diagramSelections = applyDiagramSelection(
+    state.diagramSelections,
+    action.cardId,
+    action.hotspotIndex
+  );
   persistViewState();
   renderTheory();
 }
@@ -955,10 +1063,10 @@ function flipFlashcard() {
     return;
   }
 
-  const actualIndex = visibleIndexes[state.currentCard];
-  if (!state.seenCards.has(actualIndex)) {
-    state.seenCards.add(actualIndex);
-    saveJson(getStorageKey("seenCards"), [...state.seenCards]);
+  const nextSeen = resolveSeenCardsOnFlip(visibleIndexes, state.currentCard, state.seenCards);
+  if (nextSeen.changed) {
+    state.seenCards = nextSeen.seenCards;
+    saveJson(keyFor("seenCards"), [...state.seenCards]);
     noteStudyProgress();
     rerenderProgressDependentViews();
   }
@@ -966,48 +1074,50 @@ function flipFlashcard() {
 
 function nextCard() {
   const visibleIndexes = getVisibleFlashcardIndexes();
-  if (!visibleIndexes.length) {
+  const nextIndex = getNextCardIndex(state.currentCard, visibleIndexes.length);
+  if (nextIndex === null) {
     return;
   }
 
-  state.currentCard = (state.currentCard + 1) % visibleIndexes.length;
+  state.currentCard = nextIndex;
   persistViewState();
   renderFlashcards(true);
 }
 
 function previousCard() {
   const visibleIndexes = getVisibleFlashcardIndexes();
-  if (!visibleIndexes.length) {
+  const previousIndex = getPreviousCardIndex(state.currentCard, visibleIndexes.length);
+  if (previousIndex === null) {
     return;
   }
 
-  state.currentCard = (state.currentCard - 1 + visibleIndexes.length) % visibleIndexes.length;
+  state.currentCard = previousIndex;
   persistViewState();
   renderFlashcards(true);
 }
 
 function shuffleFlashcards() {
-  state.cardOrder = shuffleArray(createSequence(getContent().flashcards.length));
+  state.cardOrder = createShuffledCardOrder(getContent().flashcards.length, shuffleArray);
   state.currentCard = 0;
-  saveJson(getStorageKey("cardOrder"), state.cardOrder);
+  saveJson(keyFor("cardOrder"), state.cardOrder);
   persistViewState();
   renderFlashcards(true);
 }
 
 function handlePracticeInput(event) {
-  const input = event.target.closest("[data-problem-input]");
-  if (!input) {
+  const action = resolvePracticeInputAction(event.target);
+  if (action.type !== PRACTICE_ACTIONS.UPDATE_ANSWER) {
     return;
   }
 
-  state.practiceAnswers[input.dataset.problemInput] = input.value;
-  saveJson(getStorageKey("practiceAnswers"), state.practiceAnswers);
+  state.practiceAnswers[action.problemId] = action.value;
+  saveJson(keyFor("practiceAnswers"), state.practiceAnswers);
 }
 
 function handlePracticeClick(event) {
-  const button = event.target.closest("[data-check-problem]");
-  if (button) {
-    checkPracticeProblem(button.dataset.checkProblem);
+  const action = resolvePracticeClickAction(event.target);
+  if (action.type === PRACTICE_ACTIONS.CHECK_PROBLEM) {
+    checkPracticeProblem(action.problemId);
   }
 }
 
@@ -1018,12 +1128,16 @@ function checkPracticeProblem(problemId) {
     return;
   }
 
-  const parsedAnswer = safeNumber(state.practiceAnswers[problemId]);
-  const correct = parsedAnswer !== null && withinTolerance(parsedAnswer, problem.answer, problem.tolerance);
-
-  if (correct) {
-    state.practiceSolved.add(problemId);
-    saveJson(getStorageKey("practiceSolved"), [...state.practiceSolved]);
+  const attempt = resolvePracticeAttempt(
+    state.practiceSolved,
+    problemId,
+    state.practiceAnswers[problemId],
+    problem.answer,
+    problem.tolerance
+  );
+  if (attempt.changed) {
+    state.practiceSolved = attempt.practiceSolved;
+    saveJson(keyFor("practiceSolved"), [...state.practiceSolved]);
     state.stats.practiceSolvedCount = state.practiceSolved.size;
   }
 
@@ -1034,18 +1148,14 @@ function checkPracticeProblem(problemId) {
 
 function getPracticeResult(problemId, problem) {
   const content = getContent();
-  const rawValue = state.practiceAnswers[problemId];
-
-  if (rawValue === undefined || rawValue === "") {
+  const evaluation = evaluatePracticeAnswer(state.practiceAnswers[problemId], problem.answer, problem.tolerance);
+  if (!evaluation.answered) {
     return null;
   }
 
-  const parsedAnswer = safeNumber(rawValue);
-  const correct = parsedAnswer !== null && withinTolerance(parsedAnswer, problem.answer, problem.tolerance);
-
   return {
-    correct,
-    message: format(correct ? content.practice.correct : content.practice.wrong, {
+    correct: evaluation.correct,
+    message: format(evaluation.correct ? content.practice.correct : content.practice.wrong, {
       text: problem.explanation
     })
   };
@@ -1066,18 +1176,13 @@ function getQuizModeMessage(content) {
 }
 
 function handleQuizClick(event) {
-  const button = event.target.closest("[data-answer-question]");
-  if (!button) {
+  const action = resolveQuizClickAction(event.target, state.quizAnswers);
+  if (action.type !== QUIZ_ACTIONS.ANSWER) {
     return;
   }
 
-  const questionId = button.dataset.answerQuestion;
-  if (state.quizAnswers[questionId] !== undefined) {
-    return;
-  }
-
-  state.quizAnswers = answerQuestion(state.quizAnswers, questionId, Number(button.dataset.optionIndex));
-  saveJson(getStorageKey("quizAnswers"), state.quizAnswers);
+  state.quizAnswers = answerQuestion(state.quizAnswers, action.questionId, action.optionIndex);
+  saveJson(keyFor("quizAnswers"), state.quizAnswers);
   renderQuiz();
 }
 
@@ -1090,15 +1195,35 @@ function generateQuizVariant() {
 }
 
 function startReviewMode() {
-  const nextQuizState = createReviewQuizState(getContent(), state.reviewQueue, state.activeTopic);
-  if (!nextQuizState) {
+  const content = getContent();
+  const adaptiveTopic = resolveAdaptiveReviewTopicHelper(content, state.reviewQueue, getTopicMastery(content), "all");
+  const nextReviewCandidate = resolveAdaptiveReviewCandidate(
+    state.activeTopic,
+    adaptiveTopic,
+    (topic) => createReviewQuizState(content, state.reviewQueue, topic),
+    "all"
+  );
+
+  if (!nextReviewCandidate) {
     generateQuizVariant();
     return;
   }
 
-  Object.assign(state, nextQuizState);
+  const previousTopic = state.activeTopic;
+  state.activeTopic = nextReviewCandidate.topic;
+
+  Object.assign(state, nextReviewCandidate.candidate);
   persistQuizState();
-  renderQuiz();
+
+  if (state.activeTopic !== previousTopic) {
+    rerenderTopicDependentViews();
+    if (state.activeTopic !== "all" && content.toasts.reviewFocus) {
+      showToast(format(content.toasts.reviewFocus, { topic: content.topicLabels[state.activeTopic] }), "info");
+    }
+  } else {
+    renderQuiz();
+  }
+
   showSection("quiz");
 }
 
@@ -1109,9 +1234,9 @@ function resetQuiz() {
 }
 
 function persistQuizState() {
-  saveJson(getStorageKey("quizAnswers"), state.quizAnswers);
-  saveJson(getStorageKey("quizMode"), state.quizMode);
-  saveJson(getStorageKey("quizVariantIds"), state.quizVariantIds);
+  saveJson(keyFor("quizAnswers"), state.quizAnswers);
+  saveJson(keyFor("quizMode"), state.quizMode);
+  saveJson(keyFor("quizVariantIds"), state.quizVariantIds);
 }
 
 function isQuizCompleted(questions) {
@@ -1123,37 +1248,72 @@ function getQuizScore(questions) {
 }
 
 function finalizeQuizSession(questions) {
-  const outcome = resolveAssessmentResults(questions, state.quizAnswers, state.reviewQueue, state.quizMastered);
-  state.reviewQueue = outcome.reviewQueue;
-  state.quizMastered = outcome.quizMastered;
+  const finalized = buildFinalizedQuizSession(
+    questions,
+    state.quizAnswers,
+    state.reviewQueue,
+    state.quizMastered,
+    state.quizMode
+  );
+  state.reviewQueue = finalized.reviewQueue;
+  state.quizMastered = finalized.quizMastered;
 
-  saveJson(getStorageKey("reviewQueue"), [...state.reviewQueue]);
-  saveJson(getStorageKey("quizMastered"), [...state.quizMastered]);
+  saveJson(keyFor("reviewQueue"), [...state.reviewQueue]);
+  saveJson(keyFor("quizMastered"), [...state.quizMastered]);
 
-  recordSession("quiz", outcome.score, questions.length, getQuizSessionLabel());
+  recordSession("quiz", finalized.score, finalized.total, finalized.sessionLabel);
   state.quizLogged = true;
   rerenderProgressDependentViews();
 }
 
 function handleExamIntroClick(event) {
-  const button = event.target.closest("[data-start-exam]");
-  if (!button) {
+  const durationValue = document.getElementById("examDurationSelect")?.value ?? state.examDurationMinutes;
+  const questionCountValue = document.getElementById("examCountSelect")?.value ?? state.examQuestionCount;
+  const action = resolveExamIntroClickAction(event.target, durationValue, questionCountValue);
+  if (action.type !== EXAM_INTRO_ACTIONS.START_EXAM) {
     return;
   }
 
-  const durationSelect = document.getElementById("examDurationSelect");
-  const countSelect = document.getElementById("examCountSelect");
-  const durationMinutes = Number(durationSelect?.value || 10);
-  const questionCount = Number(countSelect?.value || 8);
-  startExam(durationMinutes, questionCount);
+  const settings = resolveExamSettings(
+    action.durationValue,
+    action.questionCountValue,
+    state.examDurationMinutes,
+    state.examQuestionCount
+  );
+  persistExamSettings(settings.durationMinutes, settings.questionCount);
+  startExam(settings.durationMinutes, settings.questionCount);
+}
+
+function handleExamIntroChange(event) {
+  const action = resolveExamIntroChangeAction(
+    event.target,
+    state.examDurationMinutes,
+    state.examQuestionCount
+  );
+  if (action.type !== EXAM_INTRO_ACTIONS.UPDATE_SETTINGS) {
+    return;
+  }
+
+  const settings = resolveExamSettings(
+    action.durationValue,
+    action.questionCountValue,
+    state.examDurationMinutes,
+    state.examQuestionCount
+  );
+  persistExamSettings(settings.durationMinutes, settings.questionCount);
 }
 
 function startExam(durationMinutes, questionCount) {
   clearExamTimer();
-  state.exam = {
-    ...createRunningExamState(getContent(), questionCount, durationMinutes, Date.now(), shuffleArray),
-    timerId: window.setInterval(handleExamTick, 1000),
-  };
+  state.exam = buildStartedExamState(
+    createRunningExamState,
+    getContent(),
+    questionCount,
+    durationMinutes,
+    Date.now(),
+    shuffleArray,
+    window.setInterval(handleExamTick, 1000)
+  );
 
   persistExamState();
   renderExam();
@@ -1161,12 +1321,14 @@ function startExam(durationMinutes, questionCount) {
 }
 
 function handleExamTick() {
-  if (state.exam.status !== "running") {
+  const action = resolveExamTickAction(state.exam, Date.now());
+
+  if (action === EXAM_TICK_ACTIONS.CLEAR_TIMER) {
     clearExamTimer();
     return;
   }
 
-  if (Date.now() >= state.exam.endAt) {
+  if (action === EXAM_TICK_ACTIONS.SUBMIT_TIMEOUT) {
     submitExam(true);
     return;
   }
@@ -1175,28 +1337,26 @@ function handleExamTick() {
 }
 
 function handleExamRuntimeClick(event) {
-  const answerButton = event.target.closest("[data-exam-answer]");
-  if (answerButton) {
-    state.exam = answerExamQuestion(state.exam, answerButton.dataset.examAnswer, Number(answerButton.dataset.optionIndex));
+  const action = resolveExamRuntimeAction(event.target);
+  if (action.type === EXAM_RUNTIME_ACTIONS.ANSWER) {
+    state.exam = answerExamQuestion(state.exam, action.questionId, action.optionIndex);
     persistExamState();
     renderExam();
     return;
   }
 
-  const submitButton = event.target.closest("[data-submit-exam]");
-  if (submitButton) {
-    submitExam(false);
+  if (action.type === EXAM_RUNTIME_ACTIONS.SUBMIT) {
+    submitExam(action.timeout);
   }
 }
 
 function handleExamResultClick(event) {
-  const button = event.target.closest("[data-reset-exam]");
-  if (!button) {
+  if (!shouldResetExamFromTarget(event.target)) {
     return;
   }
 
   clearExamTimer();
-  state.exam = createEmptyExamState();
+  state.exam = buildResetExamState(createEmptyExamState);
   persistExamState();
   renderExam();
 }
@@ -1206,15 +1366,13 @@ function getExamQuestions() {
 }
 
 function submitExam(timeout) {
-  if (state.exam.status !== "running") {
+  const submitPlan = resolveExamSubmitPlan(state.exam, timeout);
+  if (!submitPlan) {
     return;
   }
 
   clearExamTimer();
-  finalizeExamSession({
-    durationMinutes: state.exam.durationMinutes,
-    answers: { ...state.exam.answers }
-  }, timeout);
+  finalizeExamSession(submitPlan.examSnapshot, submitPlan.timeout);
 
   renderViews(["exam"]);
   rerenderProgressDependentViews();
@@ -1228,57 +1386,56 @@ function clearExamTimer() {
 }
 
 function completeChecklist() {
-  state.checked = new Set(createSequence(getContent().checklistItems.length));
-  saveJson(getStorageKey("checklist"), [...state.checked]);
+  state.checked = createCompletedChecklist(getContent().checklistItems.length);
+  saveJson(keyFor("checklist"), [...state.checked]);
   noteStudyProgress();
   renderViews(["checklist"]);
   rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function resetChecklist() {
-  state.checked.clear();
-  saveJson(getStorageKey("checklist"), []);
+  state.checked = createEmptyChecklist();
+  saveJson(keyFor("checklist"), []);
   renderViews(["checklist"]);
   rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function handleChecklistClick(event) {
-  const item = event.target.closest("[data-check-index]");
-  if (!item) {
+  const action = resolveChecklistClickAction(event.target);
+  if (action.type !== CHECKLIST_ACTIONS.TOGGLE_ITEM) {
     return;
   }
 
-  const index = Number(item.dataset.checkIndex);
-  if (state.checked.has(index)) {
-    state.checked.delete(index);
-  } else {
-    state.checked.add(index);
+  const next = resolveChecklistToggle(state.checked, action.index, getContent().checklistItems.length);
+  if (!next.changed) {
+    return;
   }
+  state.checked = next.checked;
 
-  saveJson(getStorageKey("checklist"), [...state.checked]);
+  saveJson(keyFor("checklist"), [...state.checked]);
   noteStudyProgress();
   renderViews(["checklist"]);
   rerenderProgressDependentViews({ includeAnalytics: false });
 }
 
 function handleJumpButtons(event) {
-  const reviewButton = event.target.closest("[data-action='review-now']");
-  if (reviewButton) {
+  const action = resolveJumpAction(event.target, SECTION_IDS);
+  if (action.type === JUMP_ACTIONS.REVIEW_NOW) {
     startReviewMode();
     return;
   }
 
-  const jumpButton = event.target.closest("[data-jump-section]");
-  if (jumpButton) {
-    showSection(jumpButton.dataset.jumpSection);
+  if (action.type === JUMP_ACTIONS.JUMP_SECTION) {
+    showSection(action.sectionId);
   }
 }
 
 function handleKeyboardShortcuts(event) {
   if (!dom.welcomeModal.classList.contains("hidden")) {
-    if (event.key === "Escape") {
+    const modalAction = resolveModalShortcutAction(event.key);
+    if (modalAction.type === KEYBOARD_ACTIONS.MODAL_DISMISS) {
       dismissWelcomeModal(true);
-    } else if (event.key === "Tab") {
+    } else if (modalAction.type === KEYBOARD_ACTIONS.MODAL_TRAP_FOCUS) {
       trapModalFocus(event);
     }
     return;
@@ -1288,27 +1445,28 @@ function handleKeyboardShortcuts(event) {
     return;
   }
 
-  if (state.activeSection === "quiz" && /^[a-dA-D]$/.test(event.key)) {
-    answerQuizWithKeyboard(event.key.toUpperCase().charCodeAt(0) - 65);
+  const action = resolveMainShortcutAction(event.key, state.activeSection, SECTION_IDS);
+  if (action.type === KEYBOARD_ACTIONS.QUIZ_ANSWER) {
+    answerQuizWithKeyboard(action.optionIndex);
     return;
   }
 
-  if (state.activeSection === "exam" && /^[a-dA-D]$/.test(event.key)) {
-    answerExamWithKeyboard(event.key.toUpperCase().charCodeAt(0) - 65);
+  if (action.type === KEYBOARD_ACTIONS.EXAM_ANSWER) {
+    answerExamWithKeyboard(action.optionIndex);
     return;
   }
 
-  if (/^[1-8]$/.test(event.key)) {
-    showSection(SECTION_IDS[Number(event.key) - 1]);
+  if (action.type === KEYBOARD_ACTIONS.SECTION_JUMP) {
+    showSection(action.sectionId);
     return;
   }
 
   if (state.activeSection === "flashcards") {
-    if (event.key === "ArrowRight") {
+    if (action.type === KEYBOARD_ACTIONS.FLASHCARD_NEXT) {
       nextCard();
-    } else if (event.key === "ArrowLeft") {
+    } else if (action.type === KEYBOARD_ACTIONS.FLASHCARD_PREVIOUS) {
       previousCard();
-    } else if (event.key === " ") {
+    } else if (action.type === KEYBOARD_ACTIONS.FLASHCARD_FLIP) {
       event.preventDefault();
       flipFlashcard();
     }
@@ -1316,33 +1474,33 @@ function handleKeyboardShortcuts(event) {
 }
 
 function handlePracticeKeydown(event) {
-  const input = event.target.closest("[data-problem-input]");
-  if (!input || event.key !== "Enter") {
+  const action = resolvePracticeKeydownAction(event.target, event.key);
+  if (action.type !== PRACTICE_ACTIONS.CHECK_PROBLEM) {
     return;
   }
 
   event.preventDefault();
-  checkPracticeProblem(input.dataset.problemInput);
+  checkPracticeProblem(action.problemId);
 }
 
 function answerQuizWithKeyboard(optionIndex) {
-  const question = findNextUnansweredQuestion(getActiveQuizQuestions(), state.quizAnswers);
-  if (!question || optionIndex < 0 || optionIndex > 3) {
+  const action = resolveQuizKeyboardAction(getActiveQuizQuestions(), state.quizAnswers, optionIndex);
+  if (action.type !== QUIZ_ACTIONS.ANSWER) {
     return;
   }
 
-  state.quizAnswers = answerQuestion(state.quizAnswers, question.id, optionIndex);
-  saveJson(getStorageKey("quizAnswers"), state.quizAnswers);
+  state.quizAnswers = answerQuestion(state.quizAnswers, action.questionId, action.optionIndex);
+  saveJson(keyFor("quizAnswers"), state.quizAnswers);
   renderQuiz();
 }
 
 function answerExamWithKeyboard(optionIndex) {
-  const question = findNextUnansweredQuestion(getExamQuestions(), state.exam.answers);
-  if (!question || optionIndex < 0 || optionIndex > 3) {
+  const action = resolveExamKeyboardAction(getExamQuestions(), state.exam.answers, optionIndex);
+  if (action.type !== EXAM_RUNTIME_ACTIONS.ANSWER) {
     return;
   }
 
-  state.exam = answerExamQuestion(state.exam, question.id, optionIndex);
+  state.exam = answerExamQuestion(state.exam, action.questionId, action.optionIndex);
   persistExamState();
   renderExam();
 }
@@ -1352,10 +1510,6 @@ function recordSession(type, score, total, label) {
   state.stats = buildRecordedStats(state.stats, type, score, total, label);
   syncAchievements({ persist: false });
   persistStats();
-}
-
-function getQuizSessionLabel() {
-  return getQuizSessionLabelHelper(state.quizMode);
 }
 
 function formatHistoryLabel(item, content) {
@@ -1491,13 +1645,17 @@ function handleImportProgress(event) {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result || "{}"));
-      const backupValidation = validateBackupPayload(parsed, buildContentPack(parsed.customPack ?? null));
+      const migratedPayload = migrateBackupPayload(parsed);
+      const backupValidation = validateBackupPayload(
+        migratedPayload,
+        buildContentPack(migratedPayload?.customPack ?? null)
+      );
       if (!backupValidation.valid) {
         showToast(formatImportError(getContent().importMessages.backupInvalid, backupValidation.errors), "warning");
         return;
       }
 
-      applyBackupPayload(parsed);
+      applyBackupPayload(migratedPayload);
       showToast(getContent().importMessages.backupImported, "success");
     } catch (error) {
       showToast(getContent().importMessages.backupInvalid, "warning");
@@ -1533,7 +1691,7 @@ function handleImportPack(event) {
 
       const sanitizedPack = sanitizeCustomPack(parsed);
       state.customPack = sanitizedPack;
-      saveJson(getStorageKey("customPack"), sanitizedPack);
+      saveJson(keyFor("customPack"), sanitizedPack);
       rebuildContentPack();
       showToast(getContent().importMessages.success, "success");
     } catch (error) {
@@ -1560,21 +1718,22 @@ function applyBackupPayload(payload) {
     state,
     createImportedBackupState(sanitizedPayload, state.contentPack, state.lang, SECTION_IDS, hydrateExamState)
   );
+  persistExamSettings(state.examDurationMinutes, state.examQuestionCount);
 
-  saveJson(getStorageKey("customPack"), state.customPack);
-  saveJson(getStorageKey("language"), state.lang);
-  saveJson(getStorageKey("checklist"), [...state.checked]);
-  saveJson(getStorageKey("seenCards"), [...state.seenCards]);
-  saveJson(getStorageKey("cardOrder"), state.cardOrder);
-  saveJson(getStorageKey("practiceAnswers"), state.practiceAnswers);
-  saveJson(getStorageKey("practiceSolved"), [...state.practiceSolved]);
-  saveJson(getStorageKey("quizAnswers"), state.quizAnswers);
-  saveJson(getStorageKey("quizMastered"), [...state.quizMastered]);
-  saveJson(getStorageKey("quizMode"), state.quizMode);
-  saveJson(getStorageKey("quizVariantIds"), state.quizVariantIds);
-  saveJson(getStorageKey("reviewQueue"), [...state.reviewQueue]);
-  saveJson(getStorageKey("stats"), state.stats);
-  saveJson(getStorageKey("onboardingSeen"), state.onboardingSeen);
+  saveJson(keyFor("customPack"), state.customPack);
+  saveJson(keyFor("language"), state.lang);
+  saveJson(keyFor("checklist"), [...state.checked]);
+  saveJson(keyFor("seenCards"), [...state.seenCards]);
+  saveJson(keyFor("cardOrder"), state.cardOrder);
+  saveJson(keyFor("practiceAnswers"), state.practiceAnswers);
+  saveJson(keyFor("practiceSolved"), [...state.practiceSolved]);
+  saveJson(keyFor("quizAnswers"), state.quizAnswers);
+  saveJson(keyFor("quizMastered"), [...state.quizMastered]);
+  saveJson(keyFor("quizMode"), state.quizMode);
+  saveJson(keyFor("quizVariantIds"), state.quizVariantIds);
+  saveJson(keyFor("reviewQueue"), [...state.reviewQueue]);
+  saveJson(keyFor("stats"), state.stats);
+  saveJson(keyFor("onboardingSeen"), state.onboardingSeen);
   persistExamState();
 
   normalizeStateAfterContentChange();
@@ -1585,7 +1744,7 @@ function applyBackupPayload(payload) {
 
 function clearCustomPack() {
   state.customPack = null;
-  removeStorageKey(getStorageKey("customPack"));
+  removeStorageKey(keyFor("customPack"));
   rebuildContentPack();
   showToast(getContent().importMessages.cleared, "success");
 }
@@ -1614,13 +1773,13 @@ function normalizeStateAfterContentChange() {
     )
   );
 
-  saveJson(getStorageKey("checklist"), [...state.checked]);
-  saveJson(getStorageKey("seenCards"), [...state.seenCards]);
-  saveJson(getStorageKey("cardOrder"), state.cardOrder);
-  saveJson(getStorageKey("practiceAnswers"), state.practiceAnswers);
-  saveJson(getStorageKey("practiceSolved"), [...state.practiceSolved]);
-  saveJson(getStorageKey("quizMastered"), [...state.quizMastered]);
-  saveJson(getStorageKey("reviewQueue"), [...state.reviewQueue]);
+  saveJson(keyFor("checklist"), [...state.checked]);
+  saveJson(keyFor("seenCards"), [...state.seenCards]);
+  saveJson(keyFor("cardOrder"), state.cardOrder);
+  saveJson(keyFor("practiceAnswers"), state.practiceAnswers);
+  saveJson(keyFor("practiceSolved"), [...state.practiceSolved]);
+  saveJson(keyFor("quizMastered"), [...state.quizMastered]);
+  saveJson(keyFor("reviewQueue"), [...state.reviewQueue]);
   persistExamState();
   persistQuizState();
   persistViewState();
@@ -1633,8 +1792,8 @@ function normalizeStateAfterContentChange() {
 function resetPractice() {
   state.practiceAnswers = {};
   state.practiceSolved.clear();
-  removeStorageKey(getStorageKey("practiceAnswers"));
-  saveJson(getStorageKey("practiceSolved"), []);
+  removeStorageKey(keyFor("practiceAnswers"));
+  saveJson(keyFor("practiceSolved"), []);
   state.stats.practiceSolvedCount = 0;
   persistStats();
   renderViews(["practice"]);
@@ -1658,6 +1817,8 @@ function resetAllProgress() {
   state.quizLogged = false;
   state.reviewQueue.clear();
   state.stats = createDefaultStats();
+  state.examDurationMinutes = DEFAULT_EXAM_DURATION_MINUTES;
+  state.examQuestionCount = DEFAULT_EXAM_QUESTION_COUNT;
   state.customPack = null;
   state.contentPack = buildContentPack(null);
   state.activeTopic = "all";
@@ -1678,13 +1839,22 @@ function resetAllProgress() {
     "quizVariantIds",
     "reviewQueue",
     "stats",
+    "examDurationMinutes",
+    "examQuestionCount",
     "customPack",
     "onboardingSeen",
     "examState",
     "viewState"
-  ].forEach((key) => removeStorageKey(getStorageKey(key)));
+  ].forEach((key) => removeStorageKey(keyFor(key)));
 
   renderApp();
+}
+
+function persistExamSettings(durationMinutes, questionCount) {
+  state.examDurationMinutes = durationMinutes;
+  state.examQuestionCount = questionCount;
+  saveJson(keyFor("examDurationMinutes"), state.examDurationMinutes);
+  saveJson(keyFor("examQuestionCount"), state.examQuestionCount);
 }
 
 function getContent() {
@@ -1715,7 +1885,7 @@ function syncUrlState() {
 }
 
 function persistViewState() {
-  saveJson(getStorageKey("viewState"), buildViewStateSnapshot(state));
+  saveJson(keyFor("viewState"), buildViewStateSnapshot(state));
 }
 
 async function copyCurrentViewLink() {
@@ -1764,24 +1934,31 @@ function serializeExamState(examState) {
 function persistExamState() {
   const serialized = serializeExamState(state.exam);
   if (!serialized) {
-    removeStorageKey(getStorageKey("examState"));
+    removeStorageKey(keyFor("examState"));
     return;
   }
 
-  saveJson(getStorageKey("examState"), serialized);
+  saveJson(keyFor("examState"), serialized);
 }
 
 function finalizeExamSession(examSnapshot, timeout) {
   const questions = getExamQuestions();
-  const outcome = resolveAssessmentResults(questions, examSnapshot.answers, state.reviewQueue, state.quizMastered);
-  state.reviewQueue = outcome.reviewQueue;
-  state.quizMastered = outcome.quizMastered;
+  const finalized = buildFinalizedExamSession(
+    questions,
+    examSnapshot.answers,
+    state.reviewQueue,
+    state.quizMastered,
+    examSnapshot.durationMinutes,
+    timeout
+  );
+  state.reviewQueue = finalized.reviewQueue;
+  state.quizMastered = finalized.quizMastered;
 
-  saveJson(getStorageKey("reviewQueue"), [...state.reviewQueue]);
-  saveJson(getStorageKey("quizMastered"), [...state.quizMastered]);
-  recordSession("exam", outcome.score, questions.length, `${examSnapshot.durationMinutes} min`);
+  saveJson(keyFor("reviewQueue"), [...state.reviewQueue]);
+  saveJson(keyFor("quizMastered"), [...state.quizMastered]);
+  recordSession("exam", finalized.score, finalized.total, finalized.sessionLabel);
 
-  state.exam = buildFinishedExamState(questions.map((question) => question.id), outcome, timeout);
+  state.exam = finalized.exam;
 
   persistExamState();
 }
@@ -1789,16 +1966,14 @@ function finalizeExamSession(examSnapshot, timeout) {
 function restoreRuntimeState({ notify = false } = {}) {
   clearExamTimer();
 
-  if (state.exam.status !== "running") {
+  const plan = resolveExamRestorePlan(state.exam, Date.now());
+  if (plan.action === "persist") {
     persistExamState();
     return;
   }
 
-  if ((state.exam.endAt || 0) <= Date.now()) {
-    finalizeExamSession({
-      durationMinutes: state.exam.durationMinutes,
-      answers: { ...state.exam.answers }
-    }, true);
+  if (plan.action === "timeout") {
+    finalizeExamSession(plan.examSnapshot, plan.timeout);
     return;
   }
 
@@ -1905,7 +2080,7 @@ function isAchievementUnlocked(achievementId, content) {
 }
 
 function persistStats() {
-  saveJson(getStorageKey("stats"), state.stats);
+  saveJson(keyFor("stats"), state.stats);
 }
 
 function showToast(message, tone = "info") {
@@ -1990,7 +2165,7 @@ function startWelcomeFlow() {
 
 function setOnboardingSeen(value) {
   state.onboardingSeen = Boolean(value);
-  saveJson(getStorageKey("onboardingSeen"), state.onboardingSeen);
+  saveJson(keyFor("onboardingSeen"), state.onboardingSeen);
 }
 
 function hasStudyProgress() {
@@ -2017,3 +2192,4 @@ function trapModalFocus(event) {
     first.focus();
   }
 }
+
