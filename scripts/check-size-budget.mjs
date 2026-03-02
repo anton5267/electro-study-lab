@@ -144,7 +144,9 @@ function readIntegerOption(argsOptions, argName, envName, fallback) {
 
 function sizeOf(relativePath) {
   const fullPath = path.join(rootDir, relativePath);
-  return fs.statSync(fullPath).size;
+  const content = fs.readFileSync(fullPath, "utf8");
+  // Normalize EOL so budget checks are stable across Windows/macOS/Linux checkouts.
+  return Buffer.byteLength(content.replace(/\r\n/g, "\n"), "utf8");
 }
 
 function totalJsSize(relativeDir) {
