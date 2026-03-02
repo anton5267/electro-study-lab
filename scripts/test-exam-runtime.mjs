@@ -29,13 +29,14 @@ import {
 }
 
 {
-  function createRunningExamState(content, questionCount, durationMinutes, now) {
+  function createRunningExamState(content, questionCount, durationMinutes, now, _shuffleArray, activeTopic) {
     return {
       status: "running",
       source: content.id,
       questionCount,
       durationMinutes,
       endAt: now + 1000,
+      activeTopic,
       answers: {}
     };
   }
@@ -47,11 +48,13 @@ import {
     10,
     1_000,
     () => [],
-    123
+    123,
+    "switching"
   );
 
   assert.equal(exam.status, "running");
   assert.equal(exam.source, "pack-1");
+  assert.equal(exam.activeTopic, "switching");
   assert.equal(exam.timerId, 123);
 }
 

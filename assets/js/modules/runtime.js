@@ -7,7 +7,7 @@ export function getInitialUrlState(urlString, contentPack, storedLanguage, secti
   const current = contentPack[lang];
   const rawTopic = params.get("topic");
   const activeTopic = rawTopic === "all" || current.topicLabels[rawTopic] ? rawTopic || "all" : "all";
-  const hash = url.hash.replace("#", "");
+  const hash = url.hash.replace("#", "").trim().toLowerCase();
 
   return {
     lang,
@@ -22,10 +22,12 @@ export function resolveInitialViewState(urlString, storedViewState, contentPack,
   const urlState = getInitialUrlState(urlString, contentPack, storedLanguage, sectionIds);
   const current = contentPack[urlState.lang];
   const stored = normalizeViewStateSnapshot(storedViewState, current, sectionIds);
+  const hashSection = url.hash.replace("#", "").trim().toLowerCase();
+  const hasSectionHash = sectionIds.includes(hashSection);
 
   return {
     lang: urlState.lang,
-    activeSection: url.hash ? urlState.section : stored.activeSection,
+    activeSection: hasSectionHash ? urlState.section : stored.activeSection,
     activeTopic: url.searchParams.has("topic") ? urlState.activeTopic : stored.activeTopic,
     searchQuery: url.searchParams.has("q") ? urlState.searchQuery : stored.searchQuery,
     currentCard: stored.currentCard,

@@ -461,6 +461,7 @@ function renderApp() {
 
 function renderStaticText() {
   const content = getContent();
+  const flashcardsUi = content.flashcardsUi || {};
 
   document.documentElement.lang = content.htmlLang;
   document.title = content.metaTitle;
@@ -524,12 +525,12 @@ function renderStaticText() {
   dom.theoryLead.textContent = content.sections.theory.lead;
   dom.flashcardsTitle.textContent = content.sections.flashcards.title;
   dom.flashcardsLead.textContent = content.sections.flashcards.lead;
-  dom.shuffleCardsBtn.textContent = content.flashcards.shuffle;
-  dom.fcFrontHint.textContent = content.flashcards.frontHint;
-  dom.fcBackHint.textContent = content.flashcards.backHint;
-  dom.prevCardBtn.textContent = content.flashcards.previous;
-  dom.flipCardBtn.textContent = content.flashcards.flip;
-  dom.nextCardBtn.textContent = content.flashcards.next;
+  dom.shuffleCardsBtn.textContent = flashcardsUi.shuffle || "";
+  dom.fcFrontHint.textContent = flashcardsUi.frontHint || "";
+  dom.fcBackHint.textContent = flashcardsUi.backHint || "";
+  dom.prevCardBtn.textContent = flashcardsUi.previous || "";
+  dom.flipCardBtn.textContent = flashcardsUi.flip || "";
+  dom.nextCardBtn.textContent = flashcardsUi.next || "";
   dom.practiceTitle.textContent = content.sections.practice.title;
   dom.practiceLead.textContent = content.sections.practice.lead;
   dom.resetPracticeBtn.textContent = content.practice.reset;
@@ -648,6 +649,7 @@ function renderTheoryCard(card, content) {
 
 function renderFlashcards(resetFlip = false) {
   const content = getContent();
+  const flashcardsUi = content.flashcardsUi || {};
   const visibleIndexes = getVisibleFlashcardIndexes();
 
   if (!visibleIndexes.length) {
@@ -667,11 +669,11 @@ function renderFlashcards(resetFlip = false) {
   dom.fcTerm.textContent = card.term;
   dom.fcTopic.textContent = content.topicLabels[card.topic] || card.topic;
   dom.fcDef.textContent = card.def;
-  dom.fcCounter.textContent = format(content.flashcards.counter, {
+  dom.fcCounter.textContent = format(flashcardsUi.counter || "{current} / {total}", {
     current: state.currentCard + 1,
     total: visibleIndexes.length
   });
-  dom.flashcardStatus.textContent = format(content.flashcards.status, {
+  dom.flashcardStatus.textContent = format(flashcardsUi.status || "{seen} / {total}", {
     seen: state.seenCards.size,
     total: content.flashcards.length
   });
@@ -1312,7 +1314,8 @@ function startExam(durationMinutes, questionCount) {
     durationMinutes,
     Date.now(),
     shuffleArray,
-    window.setInterval(handleExamTick, 1000)
+    window.setInterval(handleExamTick, 1000),
+    state.activeTopic
   );
 
   persistExamState();

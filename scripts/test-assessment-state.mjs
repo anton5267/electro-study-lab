@@ -84,6 +84,14 @@ function reverseShuffle(items) {
 }
 
 {
+  const topicExam = createRunningExamState(content, 3, 12, 2_000, reverseShuffle, "switching");
+  assert.deepEqual(topicExam.questionIds, ["qq-2"]);
+
+  const fallbackExam = createRunningExamState(content, 2, 12, 2_000, reverseShuffle, "measurement");
+  assert.deepEqual(fallbackExam.questionIds, ["qq-3", "qq-2"]);
+}
+
+{
   const exam = answerExamQuestion(createRunningExamState(content, 2, 10, 5_000, reverseShuffle), "qq-3", 1);
   assert.equal(exam.answers["qq-3"], 1);
 }
