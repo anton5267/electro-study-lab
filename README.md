@@ -1,10 +1,26 @@
 # Electro Study Lab
 
-Статичний навчальний застосунок для підготовки з електротехніки.
+[![Deploy Pages](https://github.com/anton5267/electro-study-lab/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/anton5267/electro-study-lab/actions/workflows/deploy-pages.yml)
+[![Quality](https://github.com/anton5267/electro-study-lab/actions/workflows/quality.yml/badge.svg)](https://github.com/anton5267/electro-study-lab/actions/workflows/quality.yml)
+[![Gitleaks](https://github.com/anton5267/electro-study-lab/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/anton5267/electro-study-lab/actions/workflows/gitleaks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Публічний застосунок: `https://anton5267.github.io/electro-study-lab/`
-План розвитку: `ROADMAP.md`
-Гайд по контенту: `CONTRIBUTING-CONTENT.md`
+Інтерактивний PWA-застосунок для підготовки з електротехніки: теорія, флешкартки, задачі, квіз, екзамен, аналітика, backup/import прогресу.
+
+- Демо: `https://anton5267.github.io/electro-study-lab/`
+- План розвитку: `ROADMAP.md`
+- Гайд по контенту: `CONTRIBUTING-CONTENT.md`
+
+## Швидкий старт (1 хв)
+
+```bash
+git clone https://github.com/anton5267/electro-study-lab.git
+cd electro-study-lab
+npm ci
+npm run serve
+```
+
+Відкрий: `http://127.0.0.1:4173`
 
 ## Структура
 

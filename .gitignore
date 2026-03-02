@@ -2,4 +2,5 @@ node_modules/
 artifacts/visual-diffs/
 artifacts/generated-study-pack.json
 artifacts/content-csv-export/
+artifacts/*.png
 dist/
