@@ -28,7 +28,7 @@
     "quality": "npm test && npm run validate && npm run content:gate && npm run content:validate:pack && npm run progress:validate:backup && npm run size:check && npm run package && npm run smoke && npm run smoke:dist && npm run smoke:dist:browser && npm run audit:a11y && npm run visual:test"
   },
   "devDependencies": {
-    "axe-core": "^4.11.1",
+    "axe-core": "^4.11.2",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0"
